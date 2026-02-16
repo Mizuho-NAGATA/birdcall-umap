@@ -27,6 +27,18 @@ print("選択されたファイル:", file_path)
 y, sr = librosa.load(file_path, sr=None)
 print("録音時間:", len(y) / sr, "秒")
 
+# ===== スペクトログラム表示 =====
+plt.figure(figsize=(12, 4))
+D = librosa.amplitude_to_db(
+        np.abs(librosa.stft(y, n_fft=2048, hop_length=512)),
+        ref=np.max
+    )
+librosa.display.specshow(D, sr=sr, x_axis='time', y_axis='hz')
+plt.colorbar(format='%+2.0f dB')
+plt.title("Spectrogram (Full Audio)")
+plt.tight_layout()
+plt.show()
+
 # ===== 0.2秒ごとにフレーム分割 =====
 frame_length = int(sr * 0.2)
 hop_length = int(sr * 0.2)
@@ -66,3 +78,4 @@ plt.title("Bird Call Clustering (UMAP)")
 plt.xlabel("UMAP Dimension 1")
 plt.ylabel("UMAP Dimension 2")
 plt.show()
+
