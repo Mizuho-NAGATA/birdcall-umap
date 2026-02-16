@@ -82,4 +82,9 @@ plt.xlabel("UMAP Dimension 1")
 plt.ylabel("UMAP Dimension 2")
 plt.show()
 
+# ===== クラスタごとの時間帯を表示 =====
+for c in range(k):
+    print(f"\nクラスタ {c}:")
+    times = [frame_times[i] for i in range(len(labels)) if labels[i] == c]
+    print(times[:10])  # 最初の10個だけ表示
 
