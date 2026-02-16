@@ -103,35 +103,46 @@ plt.xlabel("UMAP Dimension 1")
 plt.ylabel("UMAP Dimension 2")
 plt.show()
 
-# ===== クラスタごとの代表音をWAVに保存 =====
-import soundfile as sf
+# ===== クラスタごとの代表スペクトログラムを並べて表示（10個） =====
+import matplotlib.pyplot as plt
+import librosa.display
 
-output_dir = "cluster_samples"
-os.makedirs(output_dir, exist_ok=True)
+num_samples = 10  # 表示する代表音の数
+
+plt.figure(figsize=(20, 10))
+
+plot_index = 1
 
 for c in range(k):
-    # クラスタcに属するフレームのインデックス一覧
     idx_list = [i for i in range(len(labels)) if labels[i] == c]
     if len(idx_list) == 0:
         continue
 
-    # 代表として最初のフレームを使う
-    idx = idx_list[0]
-    start_time = frame_times[idx]
-    start_sample = int(start_time * sr)
-    end_sample = start_sample + frame_length
+    for n, idx in enumerate(idx_list[:num_samples]):
+        start_time = frame_times[idx]
+        start_sample = int(start_time * sr)
+        end_sample = start_sample + frame_length
+        sample = y[start_sample:end_sample]
 
-    sample = y[start_sample:end_sample]
+        D = librosa.amplitude_to_db(
+            np.abs(librosa.stft(sample, n_fft=1024, hop_length=256)),
+            ref=np.max
+        )
 
-    out_path = f"{output_dir}/cluster_{c}.wav"
-    sf.write(out_path, sample, sr)
-    print(f"クラスタ {c} の代表音を保存しました: {out_path}")
+        plt.subplot(k, num_samples, plot_index)
+        librosa.display.specshow(D, sr=sr, x_axis='time', y_axis='hz')
+        plt.title(f"C{c}-{n}")
+        plot_index += 1
+
+plt.tight_layout()
+plt.show()
     
 # ===== クラスタごとの時間帯を表示 =====
 for c in range(k):
     print(f"\nクラスタ {c}:")
     times = [frame_times[i] for i in range(len(labels)) if labels[i] == c]
     print(times[:100])  # 最初の100個だけ表示
+
 
 
 
