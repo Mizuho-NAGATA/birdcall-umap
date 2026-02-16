@@ -45,6 +45,8 @@ hop_length = int(sr * 0.2)
 
 mfcc_list = []
 
+frame_times = []  # ループの前に追加
+
 for i in range(0, len(y), hop_length):
     frame = y[i : i + frame_length]
     if len(frame) < frame_length:
@@ -87,4 +89,5 @@ for c in range(k):
     print(f"\nクラスタ {c}:")
     times = [frame_times[i] for i in range(len(labels)) if labels[i] == c]
     print(times[:10])  # 最初の10個だけ表示
+
 
