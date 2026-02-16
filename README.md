@@ -1,12 +1,114 @@
-# Understanding Key Concepts in this Project
+# Bird Call UMAP - 試行錯誤プロジェクト 🐦
+<img width="800" height="600" alt="UMAP 3kHz以上" src="https://github.com/user-attachments/assets/5c9b5964-8775-444e-88cf-07e2e3d56f79" />　
 
-## UMAP (Uniform Manifold Approximation and Projection)
-UMAP is a dimensionality reduction technique that helps in visualizing high-dimensional data in lower dimensions (like 2D or 3D). It works by approximating the structure of data and preserving local relationships, making it easier to identify patterns or clusters within the data.
+このプロジェクトは、鳥の鳴き声を機械学習とUMAPを用いてクラスタリング・可視化する**実験的なプロトタイプ**です。
 
-## MFCC (Mel-Frequency Cepstral Coefficients)
-MFCCs are features used in audio and speech processing. They represent the short-term power spectrum of sound and are derived from the cepstral representation of a signal. These features are commonly used in voice recognition systems and help in extracting meaningful information from audio signals.
+## 概要
 
-## K-Means Clustering
-K-Means is an unsupervised machine learning algorithm used to partition data into distinct groups (or clusters). It works by assigning data points to the nearest cluster center and then recalculating the cluster centers based on the new assignments. This process is repeated until the assignments no longer change, resulting in clusters that represent similar data points.
+WAVファイルから鳥の鳴き声を自動抽出し、MFCCなどの音響特徴量を用いてクラスタリングを行い、UMAPで2次元空間に可視化します。
 
-These concepts are essential for understanding how this project operates and the methodologies used for processing and analyzing the data.
+## 主な機能（開発中）
+
+- **音声ファイルの選択**: ファイルダイアログでWAVファイルを選択
+- **前処理**:
+  - ハイパスフィルタ（3000Hz以上）で高周波成分を抽出
+  - 音声区間の自動検出（無音区間の除去）
+- **特徴抽出**: MFCC（メル周波数ケプストラム係数）の計算
+- **クラスタリング**: K-Meansによる教師なし学習
+- **可視化**:
+  - UMAPを用いた2次元マッピング
+  - スペクトログラムの表示
+  - クラスタごとの代表的な鳴き声の可視化
+- **音声ファイルの出力**: クラスタごとに代表的な鳴き声セグメントをWAV形式で保存
+
+## 環境構築
+
+### 必要なライブラリ
+
+```bash
+pip install librosa matplotlib numpy scikit-learn umap-learn soundfile scipy
+```
+
+### 推奨環境
+
+- Python 3.8以上
+- tkinter（Pythonに付属）
+
+## 使用方法
+
+```bash
+python nakigoe.py
+```
+
+実行するとファイル選択ダイアログが開きます。分析対象のWAVファイルを選択してください。
+
+## 出力
+
+- **cluster_segments/** ディレクトリ: クラスタごとの代表的な鳴き声セグメント（WAV形式）
+- **UMAP可視化**: クラスタ分布の2次元プロット
+- **スペクトログラム**: 各クラスタの代表的な鳴き声の時間周波数解析
+- **コンソール出力**: 各クラスタに含まれるフレームの時間情報
+
+## 現在の試行錯誤・課題 ⚠️
+
+このプロジェクトはまだ開発初期段階です。以下のような改善が検討されています：
+
+### パラメータの調整が必要
+- **ハイパスフィルタの周波数**: 現在は3000Hzで固定。鳥の種類によって最適値が異なる可能性
+- **音声区間検出（top_db値）**: 現在45で固定。環境ノイズレベルに応じた動的調整が必要
+- **フレーム長・ホップ長**: 0.2秒で固定。より短い周期での分析が必要な場合も検討中
+- **K-Meansのクラスタ数（k=4）**: 自動決定メカニズムの実装予定
+- **MFCC係数数（n_mfcc=20）**: 最適値の検証が必要
+
+### 既知の問題
+- パラメータを手動で変更する必要がある（設定ファイル化を検討中）
+- 単一ファイルの分析のみに対応（複数ファイルの一括処理未実装）
+- 出力ファイルの重複上書きの問題あり
+- クラスタの有意性評価がない
+
+## 注意事項
+
+- このコードは**実験段階**です。本番環境での使用は推奨されません
+- パラメータ調整には試行錯誤が必要な場合があります
+- 鳥の種類や録音環境によって結果が大きく変わる可能性があります
+
+## 技術の説明 📚
+
+このプロジェクトで使用されている主要な技術について、初心者向けに説明します。
+
+### MFCC（メル周波数ケプストラム係数）とは？
+
+**MFCCは、音の特徴を人間の耳の聞き方に合わせて抽出する技術**です。
+
+- 例えるなら：人間は低い音の違いには敏感ですが、高い音の細かい違いには鈍感です。MFCCはこの人間の聴覚特性を模倣して、音を数値化します。
+- 鳥の鳴き声分析では、MFCCを使うことで、鳴き声の音質的な違いを効率的に捉えることができます。
+
+### K-Means（K平均クラスタリング）とは？
+
+**K-Meansは、似たもの同士を自動的にグループ分けする方法**です。
+
+- 例えるなら：100個のボールが机の上に散らばっていて、色が似たもの同士を4つのグループに分ける作業をK-Meansが自動でやってくれます。
+- このプロジェクトでは、MFCCで抽出した鳴き声の特徴を基に、似た特徴を持つ鳴き声を同じグループ（クラスタ）にまとめます。
+
+### UMAP（ユニフォーム マニフォールド アプロキシメーション アンド プロジェクション）とは？
+
+**UMAPは、複雑で高次元のデータを、2次元や3次元の簡単な形に圧縮して見やすく表示する技術**です。
+
+- 例えるなら：複数の教科（数学、国語、理科など）の成績という高次元データを、「理系度」と「文系度」の2つの軸で表現するようなイメージです。
+- このプロジェクトでは、MFCCで抽出した多くの特徴（高次元データ）をUMAPで2次元にまとめることで、クラスタの分布を視覚的に理解しやすくしています。
+
+## 参考資料
+
+- [librosa - Music and Audio Analysis](https://librosa.org/)
+- [UMAP - Uniform Manifold Approximation and Projection](https://umap-learn.readthedocs.io/)
+- [scikit-learn - K-Means Clustering](https://scikit-learn.org/stable/modules/generated/sklearn.cluster.KMeans.html)
+
+## ライセンス
+
+このプロジェクトは MIT ライセンスで公開されています。詳細は [LICENSE](LICENSE) をご覧ください。  
+This project is released under the MIT License. See [LICENSE](LICENSE) for details.
+
+
+## 貢献
+
+このプロジェクトはまだ試行錯誤の段階のため、フィードバックやご提案をお待ちしています.
