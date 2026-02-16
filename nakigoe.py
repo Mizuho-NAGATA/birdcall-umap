@@ -27,6 +27,14 @@ print("選択されたファイル:", file_path)
 y, sr = librosa.load(file_path, sr=None)
 print("録音時間:", len(y) / sr, "秒")
 
+# ===== 高周波だけを残すハイパスフィルタ =====
+import scipy.signal as signal
+
+cutoff = 3000  # 3000Hz以上を残す
+b, a = signal.butter(4, cutoff / (sr / 2), btype='high')
+y = signal.filtfilt(b, a, y)
+print("ハイパスフィルタ適用完了（3000Hz以上を抽出）")
+
 # ===== スペクトログラム表示 =====
 plt.figure(figsize=(12, 4))
 D = librosa.amplitude_to_db(
@@ -89,5 +97,6 @@ for c in range(k):
     print(f"\nクラスタ {c}:")
     times = [frame_times[i] for i in range(len(labels)) if labels[i] == c]
     print(times[:10])  # 最初の10個だけ表示
+
 
 
