@@ -1,6 +1,6 @@
 import tkinter as tk
 from tkinter import filedialog
-
+import os
 import librosa
 import librosa.display
 import matplotlib.pyplot as plt
@@ -121,6 +121,7 @@ for c in range(k):
     print(f"\nクラスタ {c}:")
     times = [frame_times[i] for i in range(len(labels)) if labels[i] == c]
     print(times[:100])  # 最初の100個だけ表示
+
 
 
 
