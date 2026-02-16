@@ -92,11 +92,36 @@ plt.xlabel("UMAP Dimension 1")
 plt.ylabel("UMAP Dimension 2")
 plt.show()
 
+# ===== クラスタごとの代表音をWAVに保存 =====
+import soundfile as sf
+
+output_dir = "cluster_samples"
+os.makedirs(output_dir, exist_ok=True)
+
+for c in range(k):
+    # クラスタcに属するフレームのインデックス一覧
+    idx_list = [i for i in range(len(labels)) if labels[i] == c]
+    if len(idx_list) == 0:
+        continue
+
+    # 代表として最初のフレームを使う
+    idx = idx_list[0]
+    start_time = frame_times[idx]
+    start_sample = int(start_time * sr)
+    end_sample = start_sample + frame_length
+
+    sample = y[start_sample:end_sample]
+
+    out_path = f"{output_dir}/cluster_{c}.wav"
+    sf.write(out_path, sample, sr)
+    print(f"クラスタ {c} の代表音を保存しました: {out_path}")
+    
 # ===== クラスタごとの時間帯を表示 =====
 for c in range(k):
     print(f"\nクラスタ {c}:")
     times = [frame_times[i] for i in range(len(labels)) if labels[i] == c]
-    print(times[:10])  # 最初の10個だけ表示
+    print(times[:100])  # 最初の100個だけ表示
+
 
 
 
