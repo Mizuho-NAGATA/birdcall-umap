@@ -75,7 +75,8 @@ pip install librosa matplotlib numpy scikit-learn umap-learn
 
 ## 使い方
 
-リポジトリをクローン後、スクリプトを実行します：
+ダウンロード： 画面上の緑色のcodeボタンをクリックし、Download ZIP をクリックしてお好みの場所にファイルをダウンロード。  
+スクリプト実行： 上記のPython と Python ライブラリをインストールする。次に、コマンドプロンプトを開いて、下記をコピペして Enter キーを押す。
 
 ```bash
 python main.py
