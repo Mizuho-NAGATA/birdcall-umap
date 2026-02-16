@@ -32,6 +32,7 @@ frame_length = int(sr * 0.2)
 hop_length = int(sr * 0.2)
 
 mfcc_list = []
+time_list = []  # 各フレームの開始時刻（秒）を記録
 
 for i in range(0, len(y), hop_length):
     frame = y[i : i + frame_length]
@@ -46,10 +47,13 @@ for i in range(0, len(y), hop_length):
     mfcc_std = np.std(mfcc, axis=1)
     feature = np.concatenate([mfcc_mean, mfcc_std])
     mfcc_list.append(feature)
+    time_list.append(i / sr)  # サンプル位置を秒に変換
 
 mfcc_array = np.array(mfcc_list)
+time_array = np.array(time_list)
 print("抽出フレーム数:", len(mfcc_array))
 print("特徴量 shape:", mfcc_array.shape)
+print("時間範囲:", f"{time_array[0]:.2f}秒 〜 {time_array[-1]:.2f}秒")
 
 # ===== クラスタリング =====
 k = 4
@@ -60,9 +64,22 @@ labels = kmeans.fit_predict(mfcc_array)
 umap = UMAP(n_components=2, random_state=0)
 points = umap.fit_transform(mfcc_array)
 
-plt.figure(figsize=(8, 6))
-plt.scatter(points[:, 0], points[:, 1], c=labels, cmap="tab10")
-plt.title("Bird Call Clustering (UMAP)")
+plt.figure(figsize=(10, 8))
+# 時間を色で表示（カラーバー付き）
+scatter = plt.scatter(points[:, 0], points[:, 1], c=time_array, cmap="viridis", 
+                     s=50, alpha=0.7, edgecolors='black', linewidths=0.5)
+plt.colorbar(scatter, label="時間 (秒)")
+plt.title("Bird Call Clustering (UMAP) - 色：時間経過")
 plt.xlabel("UMAP Dimension 1")
 plt.ylabel("UMAP Dimension 2")
+
+# クラスタ情報も表示
+plt.figure(figsize=(10, 8))
+plt.scatter(points[:, 0], points[:, 1], c=labels, cmap="tab10", 
+           s=50, alpha=0.7, edgecolors='black', linewidths=0.5)
+plt.colorbar(label="クラスタ")
+plt.title("Bird Call Clustering (UMAP) - 色：クラスタ")
+plt.xlabel("UMAP Dimension 1")
+plt.ylabel("UMAP Dimension 2")
+
 plt.show()
