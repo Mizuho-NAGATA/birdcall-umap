@@ -2,16 +2,17 @@
 ## Bird Call Clustering with UMAP
 
 鳥の鳴き声のWAVファイルを読み込み、音響特徴量（MFCC）を抽出してクラスタリングし、2次元に可視化するシンプルなツールです。
-音声を短時間フレームに分割し、似た鳴き声パターンを自動でグループ化します。  
+音声を短時間フレームに分割し、似た鳴き声パターンを自動でグループ化します。わが子の鳴き声を可視化したいときにどうぞ。    
 
 これは実験的な作品です。自動クラスタリングの結果は必ずしも生物学的・行動学的に正しいとは限りません。  
 結果の解釈や、分類数の妥当性は、人間が代表音声を聞いて判断する必要があります。  
-サンプル画像は、セキセイインコ オス 2歳 360秒 録音の結果です。わが子の鳴き声を可視化したいときにどうぞ。  
+サンプル画像は、セキセイインコ オス 2歳 360秒 録音の結果です。
 
-This is a simple tool that reads WAV files of bird calls, extracts acoustic features (MFCC), clusters them, and visualizes the results in two dimensions. It divides the audio into short frames and automatically groups similar call patterns.
+This is a simple tool that reads WAV files of bird calls, extracts acoustic features (MFCC), clusters them, and visualizes the results in two dimensions. It divides the audio into short frames and automatically groups similar call patterns. Feel free to use it when you want to visualize your own bird's chirping.  
+
 This is an experimental work. The results of automatic clustering are not necessarily biologically or behaviorally accurate.  
 Interpretation of results and the validity of classification numbers require human judgment based on listening to representative audio samples.  
-The sample image shows results from recording a 2-year-old male budgerigar for 360 seconds. Feel free to use it when you want to visualize your own bird's chirping.  
+The sample image shows results from recording a 2-year-old male budgerigar for 360 seconds. 
 
 ---
 
