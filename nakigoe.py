@@ -69,17 +69,17 @@ plt.figure(figsize=(10, 8))
 scatter = plt.scatter(points[:, 0], points[:, 1], c=time_array, cmap="viridis", 
                      s=50, alpha=0.7, edgecolors='black', linewidths=0.5)
 plt.colorbar(scatter, label="時間 (秒)")
-plt.title("Bird Call Clustering (UMAP) - 色：時間経過")
-plt.xlabel("UMAP Dimension 1")
-plt.ylabel("UMAP Dimension 2")
+plt.title("鳴き声クラスタリング (UMAP) - 色：時間経過")
+plt.xlabel("UMAP 第1次元")
+plt.ylabel("UMAP 第2次元")
 
 # クラスタ情報も表示
 plt.figure(figsize=(10, 8))
 plt.scatter(points[:, 0], points[:, 1], c=labels, cmap="tab10", 
            s=50, alpha=0.7, edgecolors='black', linewidths=0.5)
 plt.colorbar(label="クラスタ")
-plt.title("Bird Call Clustering (UMAP) - 色：クラスタ")
-plt.xlabel("UMAP Dimension 1")
-plt.ylabel("UMAP Dimension 2")
+plt.title("鳴き声クラスタリング (UMAP) - 色：クラスタ")
+plt.xlabel("UMAP 第1次元")
+plt.ylabel("UMAP 第2次元")
 
 plt.show()
