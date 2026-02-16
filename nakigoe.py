@@ -35,6 +35,17 @@ b, a = signal.butter(4, cutoff / (sr / 2), btype='high')
 y = signal.filtfilt(b, a, y)
 print("ハイパスフィルタ適用完了（3000Hz以上を抽出）")
 
+# ===== 鳴き声のある区間だけを抽出 =====
+intervals = librosa.effects.split(y, top_db=25)  # 25〜35が鳥に最適
+
+segments = []
+for start, end in intervals:
+    duration = (end - start) / sr
+    if duration >= 0.3:  # 0.3秒以上の音だけ採用
+        segments.append((start, end))
+
+print("抽出された鳴き声区間:", len(segments))
+
 # ===== スペクトログラム表示 =====
 plt.figure(figsize=(12, 4))
 D = librosa.amplitude_to_db(
@@ -121,6 +132,7 @@ for c in range(k):
     print(f"\nクラスタ {c}:")
     times = [frame_times[i] for i in range(len(labels)) if labels[i] == c]
     print(times[:100])  # 最初の100個だけ表示
+
 
 
 
