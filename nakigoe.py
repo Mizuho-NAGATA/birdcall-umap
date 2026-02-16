@@ -53,6 +53,9 @@ for i in range(0, len(y), hop_length):
     if np.max(np.abs(frame)) < 0.01:
         continue
 
+    # 追加：このフレームの開始時間（秒）
+    frame_times.append(i / sr)
+    
     mfcc = librosa.feature.mfcc(y=frame, sr=sr, n_mfcc=20)
     mfcc_mean = np.mean(mfcc, axis=1)
     mfcc_std = np.std(mfcc, axis=1)
@@ -78,4 +81,5 @@ plt.title("Bird Call Clustering (UMAP)")
 plt.xlabel("UMAP Dimension 1")
 plt.ylabel("UMAP Dimension 2")
 plt.show()
+
 
