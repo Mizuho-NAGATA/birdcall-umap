@@ -9,6 +9,18 @@ import numpy as np
 from sklearn.cluster import KMeans
 from umap import UMAP
 
+# ===== フィルタリング設定 =====
+# 非鳥類音声フィルタのパラメータ
+MIN_SPECTRAL_CENTROID_HZ = 2500  # スペクトル重心の最小値（人の声、低周波ノイズを除外）
+MIN_ZERO_CROSSING_RATE = 0.1  # ゼロ交差率の最小値（持続的な低音を除外）
+MIN_RMS_ENERGY = 0.005  # RMSエネルギーの最小値（ノイズレベルを除外）
+MIN_SPECTRAL_ROLLOFF_HZ = 3500  # スペクトルロールオフの最小値（低周波ノイズを除外）
+
+# 無音判定のパラメータ
+MIN_FRAME_AMPLITUDE = 0.01  # フレームの最大振幅の最小値
+MIN_FRAME_ENERGY = 0.0001  # フレームのエネルギーの最小値
+MIN_FRAME_ZCR = 0.05  # フレームのゼロ交差率の最小値
+
 # ===== ファイル選択ダイアログ =====
 root = tk.Tk()
 root.withdraw()  # ウィンドウを表示しない
@@ -70,34 +82,29 @@ for start, end in segments:
     rms = librosa.feature.rms(y=segment)[0]
     rms_mean = np.mean(rms)
     
-    # 5. スペクトルフラックス（周波数の変化率）
-    spec = np.abs(librosa.stft(segment))
-    spec_flux = np.sqrt(np.sum(np.diff(spec, axis=1)**2, axis=0))
-    spec_flux_mean = np.mean(spec_flux) if len(spec_flux) > 0 else 0
-    
     # フィルタリング条件
     # 鳥の声の特徴:
-    # - ゼロ交差率が高い（0.15以上）
-    # - スペクトル重心が高い（3000Hz以上）
-    # - 適度なエネルギー変動（スペクトルフラックス）
-    # - 低すぎないRMSエネルギー
+    # - ゼロ交差率が高い
+    # - スペクトル重心が高い（高周波に集中）
+    # - 適度なRMSエネルギー
+    # - スペクトルロールオフが高い
     
     is_bird_sound = True
     
     # 人の声や低周波ノイズを除外
-    if spectral_centroid_mean < 2500:  # 重心が低すぎる（人の声、エアコン、扇風機など）
+    if spectral_centroid_mean < MIN_SPECTRAL_CENTROID_HZ:
         is_bird_sound = False
     
     # ゼロ交差率が低すぎる場合（持続的な低音ノイズ）
-    if zcr_mean < 0.1:
+    if zcr_mean < MIN_ZERO_CROSSING_RATE:
         is_bird_sound = False
     
     # RMSエネルギーが低すぎる場合（ノイズレベル）
-    if rms_mean < 0.005:
+    if rms_mean < MIN_RMS_ENERGY:
         is_bird_sound = False
     
     # スペクトルロールオフが低すぎる場合（低周波ノイズ）
-    if spectral_rolloff_mean < 3500:
+    if spectral_rolloff_mean < MIN_SPECTRAL_ROLLOFF_HZ:
         is_bird_sound = False
     
     if is_bird_sound:
@@ -135,17 +142,17 @@ for start, end in segments:
         # 無音判定（強化版）
         # 1. 振幅ベースの判定
         max_amplitude = np.max(np.abs(frame))
-        if max_amplitude < 0.01:
+        if max_amplitude < MIN_FRAME_AMPLITUDE:
             continue
         
         # 2. エネルギーベースの判定
         energy = np.sum(frame ** 2) / len(frame)
-        if energy < 0.0001:
+        if energy < MIN_FRAME_ENERGY:
             continue
         
         # 3. ゼロ交差率での判定（ノイズフロア検出）
         frame_zcr = librosa.feature.zero_crossing_rate(frame)[0]
-        if np.mean(frame_zcr) < 0.05:  # ゼロ交差率が極端に低い = 無音またはDCノイズ
+        if np.mean(frame_zcr) < MIN_FRAME_ZCR:
             continue
 
         # 元の録音時間に戻す

@@ -69,6 +69,7 @@ python nakigoe.py
 - 出力ファイルの重複上書きの問題あり
 - クラスタの有意性評価がない
 - 非鳥類音声フィルタのパラメータは実験的な値であり、録音環境により調整が必要な場合があります
+  - パラメータは `nakigoe.py` の11〜22行目で定義されています（`MIN_SPECTRAL_CENTROID_HZ`, `MIN_ZERO_CROSSING_RATE` など）
 
 ## 注意事項
 
