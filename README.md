@@ -29,7 +29,13 @@ WAVファイルから鳥の鳴き声を自動抽出し、MFCCなどの音響特�
 ### 必要なライブラリ
 
 ```bash
-pip install librosa matplotlib numpy scikit-learn umap-learn soundfile scipy
+pip install librosa matplotlib numpy scikit-learn umap-learn soundfile scipy sounddevice
+```
+
+#### システムパッケージ（Ubuntu/Debianの場合）
+
+```bash
+sudo apt-get install python3-tk portaudio19-dev libportaudio2
 ```
 
 ### 推奨環境
@@ -38,6 +44,43 @@ pip install librosa matplotlib numpy scikit-learn umap-learn soundfile scipy
 - tkinter（Pythonに付属）
 
 ## 使用方法
+
+### 方法1: GUIを使用した前処理（推奨）🆕
+
+**NEW**: 音声の前処理を視覚的に確認しながら行えるGUIツールを追加しました！
+
+```bash
+python preprocessing_gui.py
+```
+
+#### GUIの主な機能
+
+1. **WAVファイルの読み込み**: ファイル選択ボタンから音声ファイルを選択
+2. **パラメータ調整**: 各種フィルタのパラメータをGUI上で調整可能
+   - ハイパスフィルタの周波数
+   - 音声検出閾値（top_db）
+   - 最小音声長
+   - 非鳥類音声フィルタのパラメータ（スペクトル重心、ゼロ交差率、RMSエネルギー、スペクトルロールオフ）
+3. **音声を処理**: パラメータに基づいて音声を前処理
+4. **波形表示**: 処理結果を視覚的に確認
+   - 青色の部分: 残された音声（鳥の鳴き声として検出）
+   - 灰色の部分: カットされた音声（ノイズや無音として除外）
+5. **処理後の音声を再生**: 処理結果を実際に聞いて確認
+6. **パラメータの再調整**: 結果が満足できない場合、パラメータを調整して再処理
+7. **可視化を開始**: 満足のいく前処理ができたら、次のステップへ進む
+
+#### 使用の流れ
+
+1. `preprocessing_gui.py` を実行
+2. WAVファイルを選択
+3. 「音声を処理」ボタンをクリック
+4. 波形表示で青色（残された部分）と灰色（カットされた部分）を確認
+5. 「処理後の音声を再生」ボタンで結果を聞く
+6. 満足できない場合は、パラメータを調整して再度「音声を処理」
+7. 満足したら「可視化を開始」ボタンをクリック
+8. 次に `nakigoe.py` を実行して可視化処理を行う
+
+### 方法2: コマンドラインから直接実行
 
 ```bash
 python nakigoe.py

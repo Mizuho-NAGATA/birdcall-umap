@@ -26,6 +26,10 @@ wheels/
 # Output directories
 cluster_segments/
 
+# Demo and test files
+demo_*.png
+demo_*.wav
+
 # Virtual environment
 venv/
 ENV/
