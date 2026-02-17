@@ -9,6 +9,18 @@ import numpy as np
 from sklearn.cluster import KMeans
 from umap import UMAP
 
+# ===== フィルタリング設定 =====
+# 非鳥類音声フィルタのパラメータ
+MIN_SPECTRAL_CENTROID_HZ = 2500  # スペクトル重心の最小値（人の声、低周波ノイズを除外）
+MIN_ZERO_CROSSING_RATE = 0.1  # ゼロ交差率の最小値（持続的な低音を除外）
+MIN_RMS_ENERGY = 0.005  # RMSエネルギーの最小値（ノイズレベルを除外）
+MIN_SPECTRAL_ROLLOFF_HZ = 3500  # スペクトルロールオフの最小値（低周波ノイズを除外）
+
+# 無音判定のパラメータ
+MIN_FRAME_AMPLITUDE = 0.01  # フレームの最大振幅の最小値
+MIN_FRAME_ENERGY = 0.0001  # フレームのエネルギーの最小値
+MIN_FRAME_ZCR = 0.05  # フレームのゼロ交差率の最小値
+
 # ===== ファイル選択ダイアログ =====
 root = tk.Tk()
 root.withdraw()  # ウィンドウを表示しない
@@ -45,7 +57,61 @@ for start, end in intervals:
     if duration >= 0.1:  # 0.1秒以上の音だけ採用
         segments.append((start, end))
 
-print("抽出された鳴き声区間:", len(segments))
+print("初期抽出区間:", len(segments))
+
+# ===== 非鳥類音声の除外 =====
+# 鳥の声の特徴を用いて非鳥類音声（人の声、環境音など）をフィルタリング
+filtered_segments = []
+for start, end in segments:
+    segment = y[start:end]
+    
+    # 特徴量の計算
+    # 1. ゼロ交差率（Zero Crossing Rate）: 鳥の声は高い値を示す傾向
+    zcr = librosa.feature.zero_crossing_rate(segment)[0]
+    zcr_mean = np.mean(zcr)
+    
+    # 2. スペクトル重心（Spectral Centroid）: 鳥の声は高周波に集中
+    spectral_centroids = librosa.feature.spectral_centroid(y=segment, sr=sr)[0]
+    spectral_centroid_mean = np.mean(spectral_centroids)
+    
+    # 3. スペクトルロールオフ（Spectral Rolloff）: エネルギーの85%が含まれる周波数
+    spectral_rolloff = librosa.feature.spectral_rolloff(y=segment, sr=sr, roll_percent=0.85)[0]
+    spectral_rolloff_mean = np.mean(spectral_rolloff)
+    
+    # 4. RMS エネルギー
+    rms = librosa.feature.rms(y=segment)[0]
+    rms_mean = np.mean(rms)
+    
+    # フィルタリング条件
+    # 鳥の声の特徴:
+    # - ゼロ交差率が高い
+    # - スペクトル重心が高い（高周波に集中）
+    # - 適度なRMSエネルギー
+    # - スペクトルロールオフが高い
+    
+    is_bird_sound = True
+    
+    # 人の声や低周波ノイズを除外
+    if spectral_centroid_mean < MIN_SPECTRAL_CENTROID_HZ:
+        is_bird_sound = False
+    
+    # ゼロ交差率が低すぎる場合（持続的な低音ノイズ）
+    if zcr_mean < MIN_ZERO_CROSSING_RATE:
+        is_bird_sound = False
+    
+    # RMSエネルギーが低すぎる場合（ノイズレベル）
+    if rms_mean < MIN_RMS_ENERGY:
+        is_bird_sound = False
+    
+    # スペクトルロールオフが低すぎる場合（低周波ノイズ）
+    if spectral_rolloff_mean < MIN_SPECTRAL_ROLLOFF_HZ:
+        is_bird_sound = False
+    
+    if is_bird_sound:
+        filtered_segments.append((start, end))
+
+segments = filtered_segments
+print("非鳥類音声除外後:", len(segments), "区間")
 
 # ===== スペクトログラム表示 =====
 plt.figure(figsize=(12, 4))
@@ -73,8 +139,20 @@ for start, end in segments:
         if len(frame) < frame_length:
             break
 
-        # 無音判定
-        if np.max(np.abs(frame)) < 0.01:
+        # 無音判定（強化版）
+        # 1. 振幅ベースの判定
+        max_amplitude = np.max(np.abs(frame))
+        if max_amplitude < MIN_FRAME_AMPLITUDE:
+            continue
+        
+        # 2. エネルギーベースの判定
+        energy = np.sum(frame ** 2) / len(frame)
+        if energy < MIN_FRAME_ENERGY:
+            continue
+        
+        # 3. ゼロ交差率での判定（ノイズフロア検出）
+        frame_zcr = librosa.feature.zero_crossing_rate(frame)[0]
+        if np.mean(frame_zcr) < MIN_FRAME_ZCR:
             continue
 
         # 元の録音時間に戻す
