@@ -29,8 +29,8 @@ def test_preprocessing():
     t = np.linspace(0, duration, int(sr * duration))
     
     # Create a chirp signal (simulating bird call)
-    frequency = 3000 + 1000 * t
-    y = np.sin(2 * np.pi * frequency * t)
+    chirp_frequency = 3000 + 1000 * t
+    y = np.sin(2 * np.pi * chirp_frequency * t)
     
     # Add some noise
     y += 0.1 * np.random.randn(len(y))

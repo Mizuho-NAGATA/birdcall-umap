@@ -173,10 +173,13 @@ class AudioPreprocessingGUI:
         
         # Highlight kept segments
         if segments:
+            first_segment = True
             for start, end in segments:
                 segment_times = times[start:end]
                 segment_y = y[start:end]
-                self.ax.plot(segment_times, segment_y, linewidth=0.5, color='blue', label='残された部分' if start == segments[0][0] else '')
+                label = '残された部分' if first_segment else ''
+                self.ax.plot(segment_times, segment_y, linewidth=0.5, color='blue', label=label)
+                first_segment = False
         
         self.ax.set_xlabel('時間 (秒)')
         self.ax.set_ylabel('振幅')
