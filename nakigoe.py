@@ -271,17 +271,20 @@ class FrameFilteringGUI:
             self.is_playing = True
             self.play_btn.config(state=tk.DISABLED)
             
-            frame_time = self.frame_times[self.current_index]
-            start_sample = int(frame_time * self.sr)
-            end_sample = start_sample + self.frame_length
-            frame_audio = self.y[start_sample:end_sample]
-            
-            # 音声再生
-            sd.play(frame_audio, self.sr)
-            sd.wait()
-            
-            self.is_playing = False
-            self.play_btn.config(state=tk.NORMAL)
+            try:
+                frame_time = self.frame_times[self.current_index]
+                start_sample = int(frame_time * self.sr)
+                end_sample = min(start_sample + self.frame_length, len(self.y))
+                frame_audio = self.y[start_sample:end_sample]
+                
+                # 音声再生
+                sd.play(frame_audio, self.sr)
+                sd.wait()
+            except Exception as e:
+                print(f"再生エラー: {e}")
+            finally:
+                self.is_playing = False
+                self.play_btn.config(state=tk.NORMAL)
         
         thread = threading.Thread(target=play_audio, daemon=True)
         thread.start()
@@ -310,24 +313,27 @@ class FrameFilteringGUI:
         self.skip_btn.config(state=tk.DISABLED)
         
         def auto_play():
-            while self.auto_play_mode and self.current_index < len(self.frame_times):
-                frame_time = self.frame_times[self.current_index]
-                start_sample = int(frame_time * self.sr)
-                end_sample = start_sample + self.frame_length
-                frame_audio = self.y[start_sample:end_sample]
-                
-                # GUIを更新
-                self.root.after(0, self.update_info)
-                
-                # 音声再生
-                sd.play(frame_audio, self.sr)
-                sd.wait()
-                
-                # 次のフレームへ
-                self.current_index += 1
-            
-            # 終了時の処理
-            self.root.after(0, self.stop_auto_play)
+            try:
+                while self.auto_play_mode and self.current_index < len(self.frame_times):
+                    frame_time = self.frame_times[self.current_index]
+                    start_sample = int(frame_time * self.sr)
+                    end_sample = min(start_sample + self.frame_length, len(self.y))
+                    frame_audio = self.y[start_sample:end_sample]
+                    
+                    # GUIを更新
+                    self.root.after(0, self.update_info)
+                    
+                    # 音声再生
+                    sd.play(frame_audio, self.sr)
+                    sd.wait()
+                    
+                    # 次のフレームへ
+                    self.current_index += 1
+            except Exception as e:
+                print(f"自動再生エラー: {e}")
+            finally:
+                # 終了時の処理
+                self.root.after(0, self.stop_auto_play)
         
         thread = threading.Thread(target=auto_play, daemon=True)
         thread.start()
