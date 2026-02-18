@@ -322,9 +322,6 @@ class FrameFilteringGUI:
             self.reprocess_requested = True
             self.root.quit()
             self.root.destroy()
-        
-        # 初期表示を更新
-        self.update_info()
     
     def update_info(self):
         """現在のフレーム情報を更新"""
@@ -532,8 +529,8 @@ class FrameFilteringGUI:
             'keep_flags': self.keep_flags,
             'reprocess_requested': self.reprocess_requested,
             'params': {
-                'frame_length': self.param_frame_length,
-                'hop_length': self.param_hop_length,
+                'frame_length_sec': self.param_frame_length,
+                'hop_length_sec': self.param_hop_length,
                 'cutoff': self.param_cutoff,
                 'top_db': self.param_top_db
             }
@@ -569,6 +566,7 @@ processing_params = {
 
 # ===== メイン処理ループ =====
 reprocess = True
+first_run = True
 while reprocess:
     reprocess = False  # デフォルトでは1回のみ実行
     
@@ -595,7 +593,7 @@ while reprocess:
     print(f"抽出された鳴き声区間: {len(segments)}")
     
     # ===== スペクトログラム表示（初回のみ） =====
-    if processing_params['cutoff'] == 3000 and processing_params['top_db'] == 45:
+    if first_run:
         plt.figure(figsize=(12, 4))
         D = librosa.amplitude_to_db(
             np.abs(librosa.stft(y, n_fft=2048, hop_length=512)), ref=np.max
@@ -611,6 +609,7 @@ while reprocess:
         print(f"フルオーディオのスペクトログラムを保存しました: {spectrogram_path}")
         
         plt.show()
+        first_run = False  # 初回フラグをクリア
     
     # ===== 鳴き声区間だけをフレーム分割 =====
     frame_length_sec = processing_params['frame_length_sec']
