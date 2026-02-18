@@ -16,6 +16,10 @@ WAVファイルから鳥の鳴き声を自動抽出し、MFCCなどの音響特�
   - 音声区間の自動検出（無音区間の除去）
 - **特徴抽出**: MFCC（メル周波数ケプストラム係数）の計算
 - **クラスタリング**: K-Meansによる教師なし学習
+- **🆕 フレームフィルタリングGUI**: クラスタリング後、鳥の鳴き声でないフレームを手動で除外できるインタラクティブGUI
+  - 各フレームの再生機能
+  - 不要なフレームの除外機能
+  - 全フレームの自動再生機能
 - **可視化**:
   - UMAPを用いた2次元マッピング
   - スペクトログラムの表示
@@ -27,7 +31,7 @@ WAVファイルから鳥の鳴き声を自動抽出し、MFCCなどの音響特�
 ### 必要なライブラリ
 
 ```bash
-pip install librosa matplotlib numpy scikit-learn umap-learn soundfile scipy
+pip install librosa matplotlib numpy scikit-learn umap-learn soundfile scipy sounddevice
 ```
 
 ### 推奨環境
@@ -42,6 +46,8 @@ python nakigoe.py
 ```
 
 実行するとファイル選択ダイアログが開きます。分析対象のWAVファイルを選択してください。
+
+クラスタリング後、フレームフィルタリングGUIが表示されます。詳細な使用方法は [FILTER_GUI_USAGE.md](FILTER_GUI_USAGE.md) を参照してください。
 
 ## 出力
 
