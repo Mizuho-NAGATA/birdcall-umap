@@ -48,6 +48,9 @@ for start, end in intervals:
 print("抽出された鳴き声区間:", len(segments))
 
 # ===== スペクトログラム表示 =====
+output_dir = "cluster_segments"
+os.makedirs(output_dir, exist_ok=True)
+
 plt.figure(figsize=(12, 4))
 D = librosa.amplitude_to_db(
     np.abs(librosa.stft(y, n_fft=2048, hop_length=512)), ref=np.max
@@ -56,6 +59,12 @@ librosa.display.specshow(D, sr=sr, x_axis="time", y_axis="hz")
 plt.colorbar(format="%+2.0f dB")
 plt.title("Spectrogram (Full Audio)")
 plt.tight_layout()
+
+# 画像を保存
+spectrogram_path = os.path.join(output_dir, "spectrogram_full_audio.png")
+plt.savefig(spectrogram_path, dpi=150, bbox_inches="tight")
+print(f"フルオーディオのスペクトログラムを保存しました: {spectrogram_path}")
+
 plt.show()
 
 # ===== 鳴き声区間だけをフレーム分割 =====
@@ -104,13 +113,16 @@ plt.scatter(points[:, 0], points[:, 1], c=labels, cmap="tab10")
 plt.title("Bird Call Clustering (UMAP)")
 plt.xlabel("UMAP Dimension 1")
 plt.ylabel("UMAP Dimension 2")
+
+# 画像を保存
+umap_path = os.path.join(output_dir, "cluster_visualization_umap.png")
+plt.savefig(umap_path, dpi=150, bbox_inches="tight")
+print(f"UMAP可視化を保存しました: {umap_path}")
+
 plt.show()
 
 # ===== クラスタごとの代表鳴き声（segment全体）を保存 =====
 import soundfile as sf
-
-output_dir = "cluster_segments"
-os.makedirs(output_dir, exist_ok=True)
 
 num_samples = 10  # 保存する代表音の数
 
@@ -180,6 +192,12 @@ for c in range(k):
         plot_index += 1
 
 plt.tight_layout()
+
+# 画像を保存
+spectrograms_path = os.path.join(output_dir, "cluster_spectrograms.png")
+plt.savefig(spectrograms_path, dpi=150, bbox_inches="tight")
+print(f"クラスタスペクトログラムを保存しました: {spectrograms_path}")
+
 plt.show()
 
 # ===== クラスタごとの時間帯を表示 =====
