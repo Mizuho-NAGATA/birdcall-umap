@@ -27,7 +27,7 @@ WAVファイルから鳥の鳴き声を自動抽出し、MFCCなどの音響特�
 ### 必要なライブラリ
 
 ```bash
-pip install librosa matplotlib numpy scikit-learn umap-learn soundfile scipy
+python -m pip install librosa matplotlib numpy sounddevice scikit-learn umap-learn
 ```
 
 ### 推奨環境
