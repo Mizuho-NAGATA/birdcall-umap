@@ -1,11 +1,13 @@
 import os
 import tkinter as tk
-from tkinter import filedialog
+from tkinter import filedialog, ttk
+import threading
 
 import librosa
 import librosa.display
 import matplotlib.pyplot as plt
 import numpy as np
+import sounddevice as sd
 from sklearn.cluster import KMeans
 from umap import UMAP
 
@@ -103,6 +105,269 @@ print("特徴量 shape:", mfcc_array.shape)
 k = 4
 kmeans = KMeans(n_clusters=k, random_state=0)
 labels = kmeans.fit_predict(mfcc_array)
+
+
+# ===== フレームフィルタリングGUI =====
+class FrameFilteringGUI:
+    def __init__(self, y, sr, frame_times, mfcc_array, labels, frame_length):
+        self.y = y
+        self.sr = sr
+        self.frame_times = frame_times
+        self.mfcc_array = mfcc_array
+        self.labels = labels
+        self.frame_length = frame_length
+        
+        # フレームを除外するかのフラグ（True=残す, False=除外）
+        self.keep_flags = [True] * len(frame_times)
+        self.current_index = 0
+        self.is_playing = False
+        self.auto_play_mode = False
+        self.finished = False
+        
+        # GUIウィンドウの作成
+        self.root = tk.Tk()
+        self.root.title("フレームフィルタリング - 鳥の鳴き声選別")
+        self.root.geometry("600x400")
+        
+        # フレーム情報表示
+        info_frame = ttk.Frame(self.root, padding="10")
+        info_frame.pack(fill=tk.BOTH, expand=True)
+        
+        self.info_label = tk.Label(
+            info_frame,
+            text="",
+            font=("Arial", 14),
+            justify=tk.LEFT,
+            wraplength=550
+        )
+        self.info_label.pack(pady=20)
+        
+        # 進捗表示
+        self.progress_label = tk.Label(
+            info_frame,
+            text="",
+            font=("Arial", 12),
+            fg="blue"
+        )
+        self.progress_label.pack(pady=10)
+        
+        # ボタンフレーム
+        button_frame = ttk.Frame(self.root, padding="10")
+        button_frame.pack(pady=20)
+        
+        # 再生ボタン
+        self.play_btn = ttk.Button(
+            button_frame,
+            text="▶ 再生",
+            command=self.play_current,
+            width=15
+        )
+        self.play_btn.grid(row=0, column=0, padx=10, pady=5)
+        
+        # 除外ボタン
+        self.exclude_btn = ttk.Button(
+            button_frame,
+            text="✗ 除外",
+            command=self.exclude_current,
+            width=15
+        )
+        self.exclude_btn.grid(row=0, column=1, padx=10, pady=5)
+        
+        # スキップボタン
+        self.skip_btn = ttk.Button(
+            button_frame,
+            text="→ スキップ",
+            command=self.skip_current,
+            width=15
+        )
+        self.skip_btn.grid(row=0, column=2, padx=10, pady=5)
+        
+        # 全再生ボタン
+        self.auto_play_btn = ttk.Button(
+            button_frame,
+            text="▶▶ 全再生",
+            command=self.start_auto_play,
+            width=15
+        )
+        self.auto_play_btn.grid(row=1, column=0, padx=10, pady=5)
+        
+        # 完了ボタン
+        self.finish_btn = ttk.Button(
+            button_frame,
+            text="✓ 完了",
+            command=self.finish_filtering,
+            width=15
+        )
+        self.finish_btn.grid(row=1, column=1, padx=10, pady=5)
+        
+        # 停止ボタン
+        self.stop_btn = ttk.Button(
+            button_frame,
+            text="■ 停止",
+            command=self.stop_auto_play,
+            width=15,
+            state=tk.DISABLED
+        )
+        self.stop_btn.grid(row=1, column=2, padx=10, pady=5)
+        
+        # 使い方の説明
+        help_text = (
+            "使い方：\n"
+            "・「再生」: 現在のフレームを再生\n"
+            "・「除外」: 現在のフレームを除外リストに追加\n"
+            "・「スキップ」: 除外せずに次のフレームへ\n"
+            "・「全再生」: すべてのフレームを順番に再生\n"
+            "・「完了」: フィルタリングを終了してUMAP可視化へ"
+        )
+        help_label = tk.Label(
+            self.root,
+            text=help_text,
+            font=("Arial", 9),
+            justify=tk.LEFT,
+            fg="gray"
+        )
+        help_label.pack(pady=10)
+        
+        # 初期表示を更新
+        self.update_info()
+    
+    def update_info(self):
+        """現在のフレーム情報を更新"""
+        if self.current_index >= len(self.frame_times):
+            self.info_label.config(
+                text="すべてのフレームを確認しました。\n「完了」をクリックしてください。"
+            )
+            self.play_btn.config(state=tk.DISABLED)
+            self.exclude_btn.config(state=tk.DISABLED)
+            self.skip_btn.config(state=tk.DISABLED)
+            self.auto_play_btn.config(state=tk.DISABLED)
+            return
+        
+        frame_time = self.frame_times[self.current_index]
+        cluster = self.labels[self.current_index]
+        status = "保持" if self.keep_flags[self.current_index] else "除外済み"
+        excluded_count = sum(1 for f in self.keep_flags if not f)
+        
+        info_text = (
+            f"フレーム {self.current_index + 1} / {len(self.frame_times)}\n"
+            f"時間: {frame_time:.2f} 秒\n"
+            f"クラスタ: {cluster}\n"
+            f"状態: {status}"
+        )
+        self.info_label.config(text=info_text)
+        
+        progress_text = f"除外済み: {excluded_count} / {len(self.frame_times)}"
+        self.progress_label.config(text=progress_text)
+    
+    def play_current(self):
+        """現在のフレームを再生"""
+        if self.current_index >= len(self.frame_times):
+            return
+        
+        if self.is_playing:
+            return
+        
+        def play_audio():
+            self.is_playing = True
+            self.play_btn.config(state=tk.DISABLED)
+            
+            frame_time = self.frame_times[self.current_index]
+            start_sample = int(frame_time * self.sr)
+            end_sample = start_sample + self.frame_length
+            frame_audio = self.y[start_sample:end_sample]
+            
+            # 音声再生
+            sd.play(frame_audio, self.sr)
+            sd.wait()
+            
+            self.is_playing = False
+            self.play_btn.config(state=tk.NORMAL)
+        
+        thread = threading.Thread(target=play_audio, daemon=True)
+        thread.start()
+    
+    def exclude_current(self):
+        """現在のフレームを除外"""
+        if self.current_index >= len(self.frame_times):
+            return
+        
+        self.keep_flags[self.current_index] = False
+        self.update_info()
+    
+    def skip_current(self):
+        """次のフレームへスキップ"""
+        if self.current_index < len(self.frame_times):
+            self.current_index += 1
+            self.update_info()
+    
+    def start_auto_play(self):
+        """全フレームを自動再生"""
+        self.auto_play_mode = True
+        self.auto_play_btn.config(state=tk.DISABLED)
+        self.stop_btn.config(state=tk.NORMAL)
+        self.play_btn.config(state=tk.DISABLED)
+        self.exclude_btn.config(state=tk.DISABLED)
+        self.skip_btn.config(state=tk.DISABLED)
+        
+        def auto_play():
+            while self.auto_play_mode and self.current_index < len(self.frame_times):
+                frame_time = self.frame_times[self.current_index]
+                start_sample = int(frame_time * self.sr)
+                end_sample = start_sample + self.frame_length
+                frame_audio = self.y[start_sample:end_sample]
+                
+                # GUIを更新
+                self.root.after(0, self.update_info)
+                
+                # 音声再生
+                sd.play(frame_audio, self.sr)
+                sd.wait()
+                
+                # 次のフレームへ
+                self.current_index += 1
+            
+            # 終了時の処理
+            self.root.after(0, self.stop_auto_play)
+        
+        thread = threading.Thread(target=auto_play, daemon=True)
+        thread.start()
+    
+    def stop_auto_play(self):
+        """自動再生を停止"""
+        self.auto_play_mode = False
+        sd.stop()
+        self.auto_play_btn.config(state=tk.NORMAL)
+        self.stop_btn.config(state=tk.DISABLED)
+        self.play_btn.config(state=tk.NORMAL)
+        self.exclude_btn.config(state=tk.NORMAL)
+        self.skip_btn.config(state=tk.NORMAL)
+        self.update_info()
+    
+    def finish_filtering(self):
+        """フィルタリングを完了"""
+        self.finished = True
+        self.root.quit()
+        self.root.destroy()
+    
+    def run(self):
+        """GUIを表示して実行"""
+        self.root.mainloop()
+        return self.keep_flags
+
+
+# フィルタリングGUIを起動
+print("\n===== フレームフィルタリング =====")
+print("GUIでフレームをフィルタリングします...")
+gui = FrameFilteringGUI(y, sr, frame_times, mfcc_array, labels, frame_length)
+keep_flags = gui.run()
+
+# フィルタリング結果を適用
+filtered_indices = [i for i in range(len(keep_flags)) if keep_flags[i]]
+frame_times = [frame_times[i] for i in filtered_indices]
+mfcc_array = mfcc_array[filtered_indices]
+labels = labels[filtered_indices]
+
+print(f"フィルタリング完了: {len(filtered_indices)} / {len(keep_flags)} フレームを保持")
 
 # ===== UMAP 可視化 =====
 umap = UMAP(n_components=2, random_state=0)
