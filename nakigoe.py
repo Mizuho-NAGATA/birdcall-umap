@@ -1,6 +1,6 @@
 import os
 import tkinter as tk
-from tkinter import filedialog, ttk
+from tkinter import filedialog, ttk, messagebox
 import threading
 
 import librosa
@@ -8,6 +8,7 @@ import librosa.display
 import matplotlib.pyplot as plt
 import numpy as np
 import sounddevice as sd
+import soundfile as sf
 from sklearn.cluster import KMeans
 from umap import UMAP
 
@@ -127,7 +128,7 @@ class FrameFilteringGUI:
         # GUIウィンドウの作成
         self.root = tk.Tk()
         self.root.title("フレームフィルタリング - 鳥の鳴き声選別")
-        self.root.geometry("600x400")
+        self.root.geometry("700x500")
         
         # フレーム情報表示
         info_frame = ttk.Frame(self.root, padding="10")
@@ -138,7 +139,7 @@ class FrameFilteringGUI:
             text="",
             font=("Arial", 14),
             justify=tk.LEFT,
-            wraplength=550
+            wraplength=650
         )
         self.info_label.pack(pady=20)
         
@@ -155,6 +156,26 @@ class FrameFilteringGUI:
         button_frame = ttk.Frame(self.root, padding="10")
         button_frame.pack(pady=20)
         
+        # ナビゲーションボタン（前へ・次へ）
+        nav_frame = ttk.Frame(button_frame)
+        nav_frame.grid(row=0, column=0, columnspan=3, pady=10)
+        
+        self.prev_btn = ttk.Button(
+            nav_frame,
+            text="◀ 前へ",
+            command=self.play_prev,
+            width=15
+        )
+        self.prev_btn.grid(row=0, column=0, padx=10, pady=5)
+        
+        self.next_btn = ttk.Button(
+            nav_frame,
+            text="次へ ▶",
+            command=self.play_next,
+            width=15
+        )
+        self.next_btn.grid(row=0, column=1, padx=10, pady=5)
+        
         # 再生ボタン
         self.play_btn = ttk.Button(
             button_frame,
@@ -162,7 +183,7 @@ class FrameFilteringGUI:
             command=self.play_current,
             width=15
         )
-        self.play_btn.grid(row=0, column=0, padx=10, pady=5)
+        self.play_btn.grid(row=1, column=0, padx=10, pady=5)
         
         # 除外ボタン
         self.exclude_btn = ttk.Button(
@@ -171,16 +192,16 @@ class FrameFilteringGUI:
             command=self.exclude_current,
             width=15
         )
-        self.exclude_btn.grid(row=0, column=1, padx=10, pady=5)
+        self.exclude_btn.grid(row=1, column=1, padx=10, pady=5)
         
-        # スキップボタン
-        self.skip_btn = ttk.Button(
+        # 保存ボタン
+        self.save_btn = ttk.Button(
             button_frame,
-            text="→ スキップ",
-            command=self.skip_current,
+            text="💾 保存",
+            command=self.save_current_frame,
             width=15
         )
-        self.skip_btn.grid(row=0, column=2, padx=10, pady=5)
+        self.save_btn.grid(row=1, column=2, padx=10, pady=5)
         
         # 全再生ボタン
         self.auto_play_btn = ttk.Button(
@@ -189,7 +210,7 @@ class FrameFilteringGUI:
             command=self.start_auto_play,
             width=15
         )
-        self.auto_play_btn.grid(row=1, column=0, padx=10, pady=5)
+        self.auto_play_btn.grid(row=2, column=0, padx=10, pady=5)
         
         # 完了ボタン
         self.finish_btn = ttk.Button(
@@ -198,7 +219,7 @@ class FrameFilteringGUI:
             command=self.finish_filtering,
             width=15
         )
-        self.finish_btn.grid(row=1, column=1, padx=10, pady=5)
+        self.finish_btn.grid(row=2, column=1, padx=10, pady=5)
         
         # 停止ボタン
         self.stop_btn = ttk.Button(
@@ -208,14 +229,15 @@ class FrameFilteringGUI:
             width=15,
             state=tk.DISABLED
         )
-        self.stop_btn.grid(row=1, column=2, padx=10, pady=5)
+        self.stop_btn.grid(row=2, column=2, padx=10, pady=5)
         
         # 使い方の説明
         help_text = (
             "使い方：\n"
+            "・「前へ」「次へ」: フレームを移動して自動再生\n"
             "・「再生」: 現在のフレームを再生\n"
             "・「除外」: 現在のフレームを除外リストに追加\n"
-            "・「スキップ」: 除外せずに次のフレームへ\n"
+            "・「保存」: 現在のフレームをファイルに保存\n"
             "・「全再生」: すべてのフレームを順番に再生\n"
             "・「完了」: フィルタリングを終了してUMAP可視化へ"
         )
@@ -239,8 +261,10 @@ class FrameFilteringGUI:
             )
             self.play_btn.config(state=tk.DISABLED)
             self.exclude_btn.config(state=tk.DISABLED)
-            self.skip_btn.config(state=tk.DISABLED)
+            self.prev_btn.config(state=tk.DISABLED)
+            self.next_btn.config(state=tk.DISABLED)
             self.auto_play_btn.config(state=tk.DISABLED)
+            self.save_btn.config(state=tk.DISABLED)
             return
         
         frame_time = self.frame_times[self.current_index]
@@ -258,6 +282,18 @@ class FrameFilteringGUI:
         
         progress_text = f"除外済み: {excluded_count} / {len(self.frame_times)}"
         self.progress_label.config(text=progress_text)
+        
+        # 前へボタンの有効/無効を制御
+        if self.current_index == 0:
+            self.prev_btn.config(state=tk.DISABLED)
+        else:
+            self.prev_btn.config(state=tk.NORMAL)
+        
+        # 次へボタンの有効/無効を制御
+        if self.current_index >= len(self.frame_times) - 1:
+            self.next_btn.config(state=tk.DISABLED)
+        else:
+            self.next_btn.config(state=tk.NORMAL)
     
     def play_current(self):
         """現在のフレームを再生"""
@@ -270,6 +306,8 @@ class FrameFilteringGUI:
         def play_audio():
             self.is_playing = True
             self.play_btn.config(state=tk.DISABLED)
+            self.prev_btn.config(state=tk.DISABLED)
+            self.next_btn.config(state=tk.DISABLED)
             
             try:
                 frame_time = self.frame_times[self.current_index]
@@ -285,9 +323,28 @@ class FrameFilteringGUI:
             finally:
                 self.is_playing = False
                 self.play_btn.config(state=tk.NORMAL)
+                self.update_info()
         
         thread = threading.Thread(target=play_audio, daemon=True)
         thread.start()
+    
+    def play_prev(self):
+        """前のフレームに移動して再生"""
+        if self.current_index <= 0:
+            return
+        
+        self.current_index -= 1
+        self.update_info()
+        self.play_current()
+    
+    def play_next(self):
+        """次のフレームに移動して再生"""
+        if self.current_index >= len(self.frame_times) - 1:
+            return
+        
+        self.current_index += 1
+        self.update_info()
+        self.play_current()
     
     def exclude_current(self):
         """現在のフレームを除外"""
@@ -297,11 +354,35 @@ class FrameFilteringGUI:
         self.keep_flags[self.current_index] = False
         self.update_info()
     
-    def skip_current(self):
-        """次のフレームへスキップ"""
-        if self.current_index < len(self.frame_times):
-            self.current_index += 1
-            self.update_info()
+    def save_current_frame(self):
+        """現在のフレームをファイルに保存"""
+        if self.current_index >= len(self.frame_times):
+            messagebox.showwarning("警告", "保存するフレームがありません。")
+            return
+        
+        # ファイル保存ダイアログを開く
+        file_path = filedialog.asksaveasfilename(
+            defaultextension=".wav",
+            filetypes=[("WAV files", "*.wav"), ("All files", "*.*")],
+            initialfile=f"frame_{self.current_index}_{self.labels[self.current_index]}.wav"
+        )
+        
+        if not file_path:
+            return  # キャンセルされた場合
+        
+        try:
+            frame_time = self.frame_times[self.current_index]
+            start_sample = int(frame_time * self.sr)
+            end_sample = min(start_sample + self.frame_length, len(self.y))
+            frame_audio = self.y[start_sample:end_sample]
+            
+            # WAVファイルに保存
+            sf.write(file_path, frame_audio, self.sr)
+            messagebox.showinfo("保存完了", f"フレームを保存しました：\n{file_path}")
+            print(f"フレーム {self.current_index} を保存: {file_path}")
+        except Exception as e:
+            messagebox.showerror("エラー", f"保存に失敗しました：\n{e}")
+            print(f"保存エラー: {e}")
     
     def start_auto_play(self):
         """全フレームを自動再生"""
@@ -310,7 +391,9 @@ class FrameFilteringGUI:
         self.stop_btn.config(state=tk.NORMAL)
         self.play_btn.config(state=tk.DISABLED)
         self.exclude_btn.config(state=tk.DISABLED)
-        self.skip_btn.config(state=tk.DISABLED)
+        self.prev_btn.config(state=tk.DISABLED)
+        self.next_btn.config(state=tk.DISABLED)
+        self.save_btn.config(state=tk.DISABLED)
         
         def auto_play():
             try:
@@ -346,7 +429,7 @@ class FrameFilteringGUI:
         self.stop_btn.config(state=tk.DISABLED)
         self.play_btn.config(state=tk.NORMAL)
         self.exclude_btn.config(state=tk.NORMAL)
-        self.skip_btn.config(state=tk.NORMAL)
+        self.save_btn.config(state=tk.NORMAL)
         self.update_info()
     
     def finish_filtering(self):
@@ -393,8 +476,6 @@ print(f"UMAP可視化を保存しました: {umap_path}")
 plt.show()
 
 # ===== クラスタごとの代表鳴き声（segment全体）を保存 =====
-import soundfile as sf
-
 num_samples = 10  # 保存する代表音の数
 
 for c in range(k):
@@ -432,6 +513,7 @@ for c in range(k):
 
                 print(f"  → 区間 {seg_i} を保存: {out_path}")
                 break
+
 # ===== クラスタごとの代表スペクトログラムを並べて表示（10個） =====
 import librosa.display
 import matplotlib.pyplot as plt
