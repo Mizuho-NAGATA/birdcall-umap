@@ -1,6 +1,7 @@
 import os
 import tkinter as tk
 from tkinter import filedialog, ttk, messagebox
+import tkinter.font as tkfont
 import threading
 
 import librosa
@@ -37,11 +38,22 @@ class FrameFilteringGUI:
         self.auto_play_mode = False
         self.finished = False
         self.reprocess_requested = False
+
+        # フォントサイズ管理（追加）
+        self.font_size = 12
         
         # GUIウィンドウの作成
         self.root = tk.Tk()
         self.root.title("フレームフィルタリング - 鳥の鳴き声選別")
         self.root.geometry("700x750")
+
+        # ベースフォントを取得して初期サイズを設定
+        try:
+            self.base_font = tkfont.nametofont("TkDefaultFont")
+            self.base_font.configure(size=self.font_size)
+        except Exception:
+            # 環境によっては失敗することがあるが無視して続行
+            self.base_font = None
         
         # フレーム情報表示
         info_frame = ttk.Frame(self.root, padding="10")
@@ -263,6 +275,19 @@ class FrameFilteringGUI:
         self.top_db_slider.set(self.param_top_db)
         self.top_db_slider.pack(side=tk.LEFT, padx=5)
         
+        # フォントサイズ調整（追加） - これ以外は元に戻すため最小限の変更です
+        font_frame = ttk.Frame(param_frame)
+        font_frame.pack(fill=tk.X, pady=5)
+        
+        ttk.Label(font_frame, text="GUI フォントサイズ:").pack(side=tk.LEFT, padx=5)
+        self.font_size_label = ttk.Label(font_frame, text=str(self.font_size), width=4)
+        self.font_size_label.pack(side=tk.LEFT, padx=5)
+        
+        dec_font_btn = ttk.Button(font_frame, text="A-", command=lambda: self.change_font_size(-1), width=6)
+        dec_font_btn.pack(side=tk.LEFT, padx=2)
+        inc_font_btn = ttk.Button(font_frame, text="A+", command=lambda: self.change_font_size(1), width=6)
+        inc_font_btn.pack(side=tk.LEFT, padx=2)
+        
         # パラメーター適用ボタン
         apply_params_btn = ttk.Button(
             param_frame,
@@ -286,8 +311,31 @@ class FrameFilteringGUI:
         param_info_label.pack(pady=5)
         
         # 初期表示を更新
+        self.apply_font_size()
         self.update_info()
     
+    def change_font_size(self, delta):
+        """フォントサイズを増減させる"""
+        self.font_size = max(8, self.font_size + delta)
+        self.font_size_label.config(text=str(self.font_size))
+        self.apply_font_size()
+
+    def apply_font_size(self):
+        """設定したフォントサイズを主要ウィジェットに適用する"""
+        # base font を更新（TkDefaultFont を使っているウィジェットは自動で変わる）
+        try:
+            if self.base_font is not None:
+                self.base_font.configure(size=self.font_size)
+        except Exception:
+            pass
+
+        # 明示的に font を指定してあるウィジェットを個別に更新
+        try:
+            self.info_label.config(font=("Arial", max(10, int(self.font_size + 2))))
+            self.progress_label.config(font=("Arial", max(10, int(self.font_size))))
+        except Exception:
+            pass
+
     def update_frame_length(self, value):
         """フレーム長パラメーターを更新"""
         self.param_frame_length = float(value)
