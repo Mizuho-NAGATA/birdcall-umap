@@ -76,6 +76,19 @@ class FrameFilteringGUI:
             fg="blue"
         )
         self.progress_label.pack(pady=10)
+
+        # ===== WAV選択エリアを追加 =====
+        audio_frame = ttk.Frame(self.root, padding="5")
+        audio_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
+
+        ttk.Label(audio_frame, text="オーディオソース:").pack(side=tk.LEFT, padx=5)
+        self.audio_path_var = tk.StringVar(value="（元のファイルを使用）")
+        self.audio_label = ttk.Label(audio_frame, textvariable=self.audio_path_var, width=50)
+        self.audio_label.pack(side=tk.LEFT, padx=5)
+
+        select_wav_btn = ttk.Button(audio_frame, text="WAVを選択", command=self.select_wav_file, width=12)
+        select_wav_btn.pack(side=tk.LEFT, padx=5)
+        # ===================================
         
         # ボタンフレーム
         button_frame = ttk.Frame(self.root, padding="10")
@@ -314,6 +327,30 @@ class FrameFilteringGUI:
         self.apply_font_size()
         self.update_info()
     
+    def select_wav_file(self):
+        """GUI上で別のWAVファイルを選択して、再生ソースを更新する"""
+        file_path = filedialog.askopenfilename(
+            title="WAVファイルを選択してください",
+            filetypes=[("WAV files", "*.wav"), ("All files", "*.*")]
+        )
+        if not file_path:
+            return
+        
+        try:
+            # librosaで読み込む（元のサンプリングレートを保持）
+            y_new, sr_new = librosa.load(file_path, sr=None)
+            self.y = y_new
+            self.sr = sr_new
+            # self.param_frame_length は秒なのでフレーム長（サンプル数）を再設定
+            self.frame_length = int(self.param_frame_length * self.sr)
+            # ラベル更新（経過時間などが見やすいように表示）
+            duration = librosa.get_duration(y=self.y, sr=self.sr)
+            display_text = f"{os.path.basename(file_path)} ({duration:.2f}s, {self.sr}Hz)"
+            self.audio_path_var.set(display_text)
+            messagebox.showinfo("読み込み完了", f"WAVファイルを読み込みました：\n{display_text}")
+        except Exception as e:
+            messagebox.showerror("読み込みエラー", f"WAVファイルの読み込みに失敗しました：\n{e}")
+    
     def change_font_size(self, delta):
         """フォントサイズを増減させる"""
         self.font_size = max(8, self.font_size + delta)
@@ -340,6 +377,11 @@ class FrameFilteringGUI:
         """フレーム長パラメーターを更新"""
         self.param_frame_length = float(value)
         self.frame_length_value_label.config(text=f"{self.param_frame_length:.2f} 秒")
+        # サンプリングレートが分かっている場合はサンプル長も更新
+        try:
+            self.frame_length = int(self.param_frame_length * self.sr)
+        except Exception:
+            pass
     
     def update_hop_length(self, value):
         """ホップ長パラメーターを更新"""
