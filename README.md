@@ -107,8 +107,3 @@ python nakigoe.py
 
 このプロジェクトは MIT ライセンスで公開されています。詳細は [LICENSE](LICENSE) をご覧ください。  
 This project is released under the MIT License. See [LICENSE](LICENSE) for details.
-
-
-## 貢献
-
-このプロジェクトはまだ試行錯誤の段階のため、フィードバックやご提案をお待ちしています.
