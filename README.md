@@ -2,7 +2,7 @@
 <img width="800" height="600" alt="UMAP 3kHz以上" src="https://github.com/user-attachments/assets/5c9b5964-8775-444e-88cf-07e2e3d56f79" />　
 
 このプロジェクトは、鳥の鳴き声を機械学習とUMAPを用いてクラスタリング・可視化を試みる**実験作品**です。  
-Copilot との協働です。作者に専門知識はなく趣味としてのプログラミングです。
+Copilot との協働です。作者に音響学の専門知識はありません。
 
 ## 概要
 
