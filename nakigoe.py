@@ -246,7 +246,7 @@ class BirdcallAnalysisGUI:
 
         self.info_label = tk.Label(
             info_frame,
-            text="ファイルを��択して処理を開始してください",
+            text="ファイルを選択して処理を開始してください",
             font=("Arial", max(12, int(self.font_size + 2))),
             justify=tk.LEFT,
             wraplength=wraplength
@@ -1143,3 +1143,4 @@ class BirdcallAnalysisGUI:
 if __name__ == "__main__":
     app = BirdcallAnalysisGUI()
     app.run()
+
