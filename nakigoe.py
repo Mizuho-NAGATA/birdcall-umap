@@ -67,7 +67,7 @@ class BirdcallAnalysisGUI:
             self.base_font.configure(size=self.font_size)
         except Exception:
             self.base_font = None
-
+            
         # ウィンドウ初期サイズをフォントサイズに合わせて計算・設定
         try:
             scale = float(self.font_size) / 12.0
@@ -75,8 +75,7 @@ class BirdcallAnalysisGUI:
             height = max(300, int(self._base_height * scale))
             self.root.geometry(f"{width}x{height}")
         except Exception:
-            # フォントサイズ反映に失敗したらデフォルトを使用
-            self.root.geometry("750x850")
+            pass
         
         # ===== ファイル選択エリア =====
         file_frame = ttk.LabelFrame(self.root, text="1. WAVファイル選択", padding="10")
@@ -890,3 +889,4 @@ class BirdcallAnalysisGUI:
 if __name__ == "__main__":
     app = BirdcallAnalysisGUI()
     app.run()
+
