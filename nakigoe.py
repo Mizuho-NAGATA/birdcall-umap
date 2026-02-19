@@ -23,7 +23,8 @@ class BirdcallAnalysisGUI:
     def __init__(self):
         # 音声データとパラメーター
         self.file_path = None
-        self.y = None
+        self.y_original = None  # 元の読み込み音声（処理前）
+        self.y = None  # フィルタ適用後など（処理後、再生用）
         self.sr = None
         self.frame_times = []
         self.mfcc_array = None
@@ -55,7 +56,8 @@ class BirdcallAnalysisGUI:
 
         # spectrogram / playback state
         self.spec_fig = None
-        self.spec_ax = None
+        self.spec_ax_pre = None
+        self.spec_ax_post = None
         self.canvas = None
         self.rect_patch = None
         self.selection = (0.0, 0.0)  # start_sec, end_sec
@@ -374,11 +376,10 @@ class BirdcallAnalysisGUI:
             "2. 各フレームを「前へ」「次へ」で確認\n"
             "3. 不要なフレームは「除外」\n"
             "4. 「完了」でUMAP可視化へ\n\n"
-            "スペクトログラムコントロール:\n"
-            "- スペース: 選択範囲の再生/停止\n"
-            "- ← / → : 選択範囲をフレーム単位で移動（長押しで連続移動）\n"
-            "- スライダで時間範囲を指定 → 指定範囲は濃く表示されます\n"
-            "- Delete キー: 選択範囲内のフレームを除外"
+            "スペクトログラム表示:\n"
+            "上: 処理前スペクトログラム（元音声）\n"
+            "下: 処理後スペクトログラム（フィルタ・抽出後）\n"
+            "パラメーターを変更して「処理開始」を押すと再処理します。"
         )
         help_label = tk.Label(
             info_frame,
@@ -389,18 +390,18 @@ class BirdcallAnalysisGUI:
         )
         help_label.pack(pady=5)
 
-        # ===== スペクトログラム表示エリア =====
-        spec_frame = ttk.LabelFrame(self.root, text="4. スペクトログラムと選択", padding="6")
+        # ===== スペクトログラム表示エリア (上下に並べる) =====
+        spec_frame = ttk.LabelFrame(self.root, text="4. スペクトログラム (処理前 / 処理後)", padding="6")
         spec_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
-        # Matplotlib Figure
-        self.spec_fig, self.spec_ax = plt.subplots(figsize=(8, 3))
+        # Matplotlib Figure: 2 行で上下に並べる
+        self.spec_fig, (self.spec_ax_pre, self.spec_ax_post) = plt.subplots(2, 1, figsize=(8, 6), sharex=True)
         plt.tight_layout()
 
         self.canvas = FigureCanvasTkAgg(self.spec_fig, master=spec_frame)
         self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
 
-        # スライダー2つ (start, end)
+        # スライダー2つ (start, end) - 選択は「処理後」スペクトログラムに反映
         slider_frame = ttk.Frame(spec_frame)
         slider_frame.pack(fill=tk.X, pady=4)
 
@@ -430,7 +431,7 @@ class BirdcallAnalysisGUI:
         self.spec_delete_btn = ttk.Button(spec_button_frame, text="Delete Selection", command=self.delete_selection_frames, state=tk.DISABLED)
         self.spec_delete_btn.grid(row=0, column=1, padx=4)
 
-        # 左右移動ボタン(長押し対応)
+        # 左右移動ボタン(長押し対応) - 選択範囲を移動
         self.left_btn = ttk.Button(spec_button_frame, text="◀", width=4)
         self.left_btn.grid(row=0, column=2, padx=4)
         self.left_btn.bind("<ButtonPress-1>", lambda e: self.start_repeat(-1))
@@ -464,7 +465,7 @@ class BirdcallAnalysisGUI:
             print(f"選択されたファイル: {file_path}")
 
     def start_processing(self):
-        """音声処理を開始"""
+        """音声処理を開始（再処理も可能）"""
         if not self.file_path:
             messagebox.showerror("エラー", "ファイルが選択されていません")
             return
@@ -473,7 +474,7 @@ class BirdcallAnalysisGUI:
         self.process_btn.config(state=tk.DISABLED)
         self.info_label.config(text="処理中...")
 
-        # 別スレッドで処理を実行
+        # 別スレッドで処理を実行（再処理をサポート）
         thread = threading.Thread(target=self.process_audio, daemon=True)
         thread.start()
 
@@ -485,7 +486,9 @@ class BirdcallAnalysisGUI:
             os.makedirs(output_dir, exist_ok=True)
 
             # ===== 音声読み込み =====
+            # 常に元音声を保存（再処理時は上書き）
             y_original, sr = librosa.load(self.file_path, sr=None)
+            self.y_original = y_original
             print(f"\n録音時間: {len(y_original) / sr:.2f} 秒")
 
             # ===== 高周波だけを残すハイパスフィルタ =====
@@ -493,6 +496,8 @@ class BirdcallAnalysisGUI:
             b, a = signal.butter(4, cutoff / (sr / 2), btype="high")
             y = signal.filtfilt(b, a, y_original)
             print(f"ハイパスフィルタ適用完了（{cutoff}Hz以上を抽出）")
+            self.y = y
+            self.sr = sr
 
             # ===== 鳴き声のある区間だけを抽出 =====
             top_db = self.param_top_db
@@ -507,12 +512,18 @@ class BirdcallAnalysisGUI:
             print(f"抽出された鳴き声区間: {len(segments)}")
             self.segments = segments
 
-            # ===== スペクトログラム表示 =====
-            # 作図は UI スレッド側で行うためデータだけ準備しておく
-            D = np.abs(librosa.stft(y, n_fft=2048, hop_length=512))
-            D_db = librosa.amplitude_to_db(D, ref=np.max)
-            times = librosa.frames_to_time(np.arange(D_db.shape[1]), sr=sr, hop_length=512)
-            freqs = librosa.fft_frequencies(sr=sr, n_fft=2048)
+            # ===== スペクトログラムデータ（処理前・処理後） =====
+            n_fft = 2048
+            hop = 512
+
+            D_pre = np.abs(librosa.stft(y_original, n_fft=n_fft, hop_length=hop))
+            D_db_pre = librosa.amplitude_to_db(D_pre, ref=np.max)
+
+            D_post = np.abs(librosa.stft(y, n_fft=n_fft, hop_length=hop))
+            D_db_post = librosa.amplitude_to_db(D_post, ref=np.max)
+
+            times = librosa.frames_to_time(np.arange(D_db_post.shape[1]), sr=sr, hop_length=hop)
+            freqs = librosa.fft_frequencies(sr=sr, n_fft=n_fft)
 
             # ===== 鳴き声区間だけをフレーム分割 =====
             frame_length_sec = self.param_frame_length
@@ -556,9 +567,7 @@ class BirdcallAnalysisGUI:
                 kmeans = KMeans(n_clusters=k, random_state=0)
                 labels = kmeans.fit_predict(mfcc_array)
 
-            # データを保存
-            self.y = y
-            self.sr = sr
+            # データを保存（上書きして再処理に対応）
             self.frame_times = frame_times
             self.mfcc_array = mfcc_array
             self.labels = labels
@@ -567,37 +576,56 @@ class BirdcallAnalysisGUI:
             self.current_index = 0
             self.processing_done = True
 
-            # reset selection to full duration
+            # reset selection to full duration (処理後音声の長さ)
             duration = len(self.y) / float(self.sr)
             self.selection = (0.0, duration)
 
             # GUIを更新（メインスレッドで実行） - スペクトログラム描画含む
-            self.root.after(0, lambda: self.enable_filtering_ui_and_draw(D_db, times, freqs))
+            self.root.after(0, lambda: self.enable_filtering_ui_and_draw(D_db_pre, D_db_post, times, freqs))
 
         except Exception as e:
             print(f"処理エラー: {e}")
             self.root.after(0, lambda: messagebox.showerror("処理エラー", f"処理中にエラーが発生しました：\n{e}"))
             self.root.after(0, lambda: self.process_btn.config(state=tk.NORMAL))
 
-    def enable_filtering_ui_and_draw(self, D_db, times, freqs):
-        """フィルタリングUIを有効化し、スペクトログラムを表示"""
+    def enable_filtering_ui_and_draw(self, D_db_pre, D_db_post, times, freqs):
+        """フィルタリングUIを有効化し、スペクトログラム（上: 処理前 / 下: 処理後）を表示"""
         self.enable_filtering_ui()
-        # Draw spectrogram in the embedded canvas
+
         try:
-            self.spec_ax.clear()
-            librosa.display.specshow(D_db, sr=self.sr, hop_length=512, x_axis="time", y_axis="hz", ax=self.spec_ax)
-            self.spec_ax.set_title("Spectrogram (Full Audio)")
+            # clear axes
+            self.spec_ax_pre.clear()
+            self.spec_ax_post.clear()
+
+            # Draw pre-processing spectrogram (always available after loading)
+            if D_db_pre is not None:
+                librosa.display.specshow(D_db_pre, sr=self.sr, hop_length=512, x_axis="time", y_axis="hz", ax=self.spec_ax_pre)
+                self.spec_ax_pre.set_title("Spectrogram (Before Processing)")
+            else:
+                self.spec_ax_pre.set_title("Spectrogram (Before Processing) - no data")
+
+            # Draw post-processing spectrogram (available after processing)
+            if D_db_post is not None:
+                librosa.display.specshow(D_db_post, sr=self.sr, hop_length=512, x_axis="time", y_axis="hz", ax=self.spec_ax_post)
+                self.spec_ax_post.set_title("Spectrogram (After Processing)")
+            else:
+                self.spec_ax_post.set_title("Spectrogram (After Processing) - no data")
+
             self.spec_fig.tight_layout()
             self.canvas.draw_idle()
         except Exception as e:
             print(f"スペクトログラム描画エラー: {e}")
 
-        # enable spec controls
-        self.spec_play_btn.config(state=tk.NORMAL)
-        self.spec_delete_btn.config(state=tk.NORMAL)
+        # set sliders ranges to audio duration (use processed audio length if available, otherwise original)
+        duration = 0.0
+        if self.y is not None and self.sr is not None:
+            duration = len(self.y) / float(self.sr)
+        elif self.y_original is not None and self.sr is not None:
+            duration = len(self.y_original) / float(self.sr)
 
-        # set sliders ranges to audio duration
-        duration = len(self.y) / float(self.sr)
+        if duration <= 0:
+            duration = 1.0
+
         self.start_slider.config(from_=0.0, to=duration, resolution=max(0.01, duration / 1000.0))
         self.end_slider.config(from_=0.0, to=duration, resolution=max(0.01, duration / 1000.0))
         self.start_slider.set(0.0)
@@ -605,9 +633,18 @@ class BirdcallAnalysisGUI:
         self.selection = (0.0, duration)
         self._draw_selection_rect()
 
+        # Enable or disable spec controls depending on whether processed audio exists
+        if self.processing_done and D_db_post is not None:
+            self.spec_play_btn.config(state=tk.NORMAL)
+            self.spec_delete_btn.config(state=tk.NORMAL)
+        else:
+            self.spec_play_btn.config(state=tk.DISABLED)
+            self.spec_delete_btn.config(state=tk.DISABLED)
+
     def enable_filtering_ui(self):
         """フィルタリングUIを有効化"""
-        self.audio_path_var.set(f"{os.path.basename(self.file_path)}")
+        if self.file_path:
+            self.audio_path_var.set(f"{os.path.basename(self.file_path)}")
         self.select_wav_btn.config(state=tk.NORMAL)
         self.prev_btn.config(state=tk.NORMAL)
         self.next_btn.config(state=tk.NORMAL)
@@ -620,7 +657,7 @@ class BirdcallAnalysisGUI:
         self.update_info()
 
     def select_wav_file(self):
-        """再生用の別のWAVファイルを選択"""
+        """再生用の別のWAVファイルを選択（処理前のスペクトログラム更新）"""
         file_path = filedialog.askopenfilename(
             title="WAVファイルを選択してください",
             filetypes=[("WAV files", "*.wav"), ("All files", "*.*")]
@@ -630,7 +667,8 @@ class BirdcallAnalysisGUI:
 
         try:
             y_new, sr_new = librosa.load(file_path, sr=None)
-            self.y = y_new
+            self.y_original = y_new
+            self.y = y_new  # playback will use this until processing
             self.sr = sr_new
             self.frame_length = int(self.param_frame_length * self.sr)
             duration = librosa.get_duration(y=self.y, sr=self.sr)
@@ -638,10 +676,16 @@ class BirdcallAnalysisGUI:
             self.audio_path_var.set(display_text)
             messagebox.showinfo("読み込み完了", f"WAVファイルを読み込みました：\n{display_text}")
 
-            # Update spectrogram for newly loaded wav
-            D = np.abs(librosa.stft(self.y, n_fft=2048, hop_length=512))
+            # Update pre-processing spectrogram for newly loaded wav (post remains as-is until processing)
+            D = np.abs(librosa.stft(self.y_original, n_fft=2048, hop_length=512))
             D_db = librosa.amplitude_to_db(D, ref=np.max)
-            self.enable_filtering_ui_and_draw(D_db, None, None)
+            # If no processed data yet, pass None for post
+            post = None
+            if self.processing_done and self.y is not None and self.y is not self.y_original:
+                # if processing was done and y differs, compute post spectrogram
+                Dp = np.abs(librosa.stft(self.y, n_fft=2048, hop_length=512))
+                post = librosa.amplitude_to_db(Dp, ref=np.max)
+            self.enable_filtering_ui_and_draw(D_db, post, None, None)
         except Exception as e:
             messagebox.showerror("読み込みエラー", f"WAVファイルの読み込みに失敗しました：\n{e}")
 
@@ -991,8 +1035,8 @@ class BirdcallAnalysisGUI:
     # Spectrogram / Selection helpers
     # ---------------------------
     def _draw_selection_rect(self):
-        """スペクトログラム上に選択範囲を描画（濃く）"""
-        if self.spec_ax is None:
+        """処理後スペクトログラム上に選択範囲を描画（濃く）"""
+        if self.spec_ax_post is None:
             return
         # remove previous patch
         if self.rect_patch is not None:
@@ -1004,16 +1048,21 @@ class BirdcallAnalysisGUI:
 
         start_sec, end_sec = self.selection
         if end_sec <= start_sec:
+            # still update canvas to remove previous
+            try:
+                self.canvas.draw_idle()
+            except Exception:
+                pass
             return
 
-        ylim = self.spec_ax.get_ylim()
+        ylim = self.spec_ax_post.get_ylim()
         height = ylim[1] - ylim[0]
         # create a rectangle spanning the selection time along x, covering whole y
         rect = patches.Rectangle((start_sec, ylim[0]), end_sec - start_sec, height,
                                  linewidth=0, facecolor='black', alpha=0.25, zorder=10)
         self.rect_patch = rect
         try:
-            self.spec_ax.add_patch(self.rect_patch)
+            self.spec_ax_post.add_patch(self.rect_patch)
             self.canvas.draw_idle()
         except Exception as e:
             print(f"選択矩形描画エラー: {e}")
@@ -1036,7 +1085,7 @@ class BirdcallAnalysisGUI:
             e = float(v)
             s, _ = self.selection
             if e <= s:
-                e = min(len(self.y) / float(self.sr), s + 0.001)
+                e = min(len(self.y) / float(self.sr) if self.y is not None else (len(self.y_original) / float(self.sr) if self.y_original is not None else 1.0), s + 0.001)
                 self.end_slider.set(e)
             self.selection = (s, e)
             self._draw_selection_rect()
@@ -1044,7 +1093,7 @@ class BirdcallAnalysisGUI:
             pass
 
     def toggle_play_selection(self):
-        """スペースまたはボタンで選択範囲の再生/停止"""
+        """スペースまたはボタンで選択範囲の再生/停止（処理後音声に対して動作）"""
         if self.y is None or self.sr is None:
             return
 
@@ -1084,10 +1133,12 @@ class BirdcallAnalysisGUI:
     def step_selection(self, direction):
         """矢印キーで選択範囲をフレーム単位で移動（direction: -1 left, +1 right）"""
         if self.y is None or self.sr is None:
-            return
+            # if no processed audio, attempt to use original
+            if self.y_original is None or self.sr is None:
+                return
         hop = max(0.01, self.param_hop_length)  # seconds
         s, e = self.selection
-        dur = len(self.y) / float(self.sr)
+        dur = len(self.y) / float(self.sr) if self.y is not None else len(self.y_original) / float(self.sr)
         s = max(0.0, min(dur, s + direction * hop))
         e = max(0.0, min(dur, e + direction * hop))
         if e <= s:
@@ -1143,5 +1194,3 @@ class BirdcallAnalysisGUI:
 if __name__ == "__main__":
     app = BirdcallAnalysisGUI()
     app.run()
-
-
