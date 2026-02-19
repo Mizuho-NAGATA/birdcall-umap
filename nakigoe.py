@@ -43,13 +43,17 @@ class BirdcallAnalysisGUI:
         # 処理状態
         self.processing_done = False
         
-        # フォントサイズ管理（初期サイズを大きくする）
+        # フォントサイズ管理（初期サイズ）
+        # ここを変更するとウィンドウの初期サイズも自動で変わります（例: 18 や 20 も可）
         self.font_size = 16
         
+        # base window size (for font_size 12)
+        self._base_width = 750
+        self._base_height = 850
+
         # GUIウィンドウの作成
         self.root = tk.Tk()
         self.root.title("鳥の鳴き声分析ツール")
-        self.root.geometry("750x850")
 
         # アプリ全体のデフォルトフォントを設定（tkウィジェットに反映）
         try:
@@ -63,6 +67,16 @@ class BirdcallAnalysisGUI:
             self.base_font.configure(size=self.font_size)
         except Exception:
             self.base_font = None
+
+        # ウィンドウ初期サイズをフォントサイズに合わせて計算・設定
+        try:
+            scale = float(self.font_size) / 12.0
+            width = max(400, int(self._base_width * scale))
+            height = max(300, int(self._base_height * scale))
+            self.root.geometry(f"{width}x{height}")
+        except Exception:
+            # フォントサイズ反映に失敗したらデフォルトを使用
+            self.root.geometry("750x850")
         
         # ===== ファイル選択エリア =====
         file_frame = ttk.LabelFrame(self.root, text="1. WAVファイル選択", padding="10")
@@ -210,19 +224,25 @@ class BirdcallAnalysisGUI:
         info_frame = ttk.LabelFrame(self.root, text="3. フレーム情報", padding="10")
         info_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
+        # info_label の wraplength はウィンドウ幅に合わせてスケーリング
+        try:
+            wraplength = int(650 * (float(self.font_size) / 12.0))
+        except Exception:
+            wraplength = 650
+
         self.info_label = tk.Label(
             info_frame,
             text="ファイルを選択して処理を開始してください",
-            font=("Arial", 14),
+            font=("Arial", max(12, int(self.font_size + 2))),
             justify=tk.LEFT,
-            wraplength=650
+            wraplength=wraplength
         )
         self.info_label.pack(pady=10)
         
         self.progress_label = tk.Label(
             info_frame,
             text="",
-            font=("Arial", 12),
+            font=("Arial", max(10, int(self.font_size))),
             fg="blue"
         )
         self.progress_label.pack(pady=5)
@@ -344,7 +364,7 @@ class BirdcallAnalysisGUI:
         help_label = tk.Label(
             info_frame,
             text=help_text,
-            font=("Arial", 9),
+            font=("Arial", max(9, int(self.font_size - 6))),
             justify=tk.LEFT,
             fg="gray"
         )
@@ -407,7 +427,7 @@ class BirdcallAnalysisGUI:
                 if duration >= 0.1:  # 0.1秒以上の音だけ採用
                     segments.append((start, end))
             
-            print(f"抽��された鳴き声区間: {len(segments)}")
+            print(f"抽出された鳴き声区間: {len(segments)}")
             self.segments = segments
             
             # ===== スペクトログラム表示 =====
@@ -536,8 +556,11 @@ class BirdcallAnalysisGUI:
 
         try:
             # 情報表示系はやや大きめに
-            self.info_label.config(font=("Arial", max(10, int(self.font_size + 2))))
+            self.info_label.config(font=("Arial", max(12, int(self.font_size + 2))))
             self.progress_label.config(font=("Arial", max(10, int(self.font_size))))
+            # wraplength も更新してウィンドウ幅に合わせる
+            wraplength = int(650 * (float(self.font_size) / 12.0))
+            self.info_label.config(wraplength=wraplength)
         except Exception:
             pass
 
@@ -666,7 +689,7 @@ class BirdcallAnalysisGUI:
         self.update_info()
     
     def save_all_frames(self):
-        """���外していないすべてのフレームを一括保存"""
+        """除外していないすべてのフレームを一括保存"""
         frames_to_save = [i for i, keep in enumerate(self.keep_flags) if keep]
         
         if not frames_to_save:
