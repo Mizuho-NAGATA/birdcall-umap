@@ -17,6 +17,30 @@ import scipy.signal as signal
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import matplotlib.patches as patches
 
+class SimpleGUI:
+    def __init__(self):
+        self.root = tk.Tk()
+        self.root.title("サンプルGUI")
+
+        # ローディング画面
+        self.loading_label = tk.Label(self.root, text="初期化中...お待ちください")
+        self.loading_label.pack(fill=tk.BOTH, expand=True, padx=30, pady=30)
+
+        # 1秒後に main 画面に切り替え
+        self.root.after(1000, self.show_main)  # 1000ミリ秒 = 1秒
+
+    def show_main(self):
+        # ローディング中ラベルを消し
+        self.loading_label.pack_forget()
+        # メイン画面表示
+        main_label = tk.Label(self.root, text="ようこそ！")
+        main_label.pack(pady=30)
+
+    def run(self):
+        self.root.mainloop()
+
+if __name__ == "__main__":
+    SimpleGUI().run()
 
 # ===== 統合GUI クラス定義 =====
 class BirdcallAnalysisGUI:
@@ -1194,3 +1218,4 @@ class BirdcallAnalysisGUI:
 if __name__ == "__main__":
     app = BirdcallAnalysisGUI()
     app.run()
+
