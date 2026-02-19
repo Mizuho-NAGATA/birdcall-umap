@@ -15,6 +15,115 @@ from umap import UMAP
 import scipy.signal as signal
 
 
+# ===== メインGUI（ファイル選択 + 処理開始） =====
+class MainGUI:
+    def __init__(self):
+        self.root = tk.Tk()
+        self.root.title("鳥の鳴き声分析 - WAVファイル選択")
+        self.root.geometry("600x300")
+        
+        # 選択されたファイルパス
+        self.file_path = None
+        self.should_start = False
+        
+        # タイトル
+        title_label = tk.Label(
+            self.root,
+            text="鳥の鳴き声分析ツール",
+            font=("Arial", 16, "bold")
+        )
+        title_label.pack(pady=20)
+        
+        # ファイル選択エリア
+        file_frame = ttk.Frame(self.root, padding="10")
+        file_frame.pack(fill=tk.X, padx=20, pady=10)
+        
+        ttk.Label(file_frame, text="WAVファイル:").pack(side=tk.LEFT, padx=5)
+        
+        self.file_path_var = tk.StringVar(value="（ファイルが選択されていません）")
+        file_label = ttk.Label(
+            file_frame,
+            textvariable=self.file_path_var,
+            relief=tk.SUNKEN,
+            width=40
+        )
+        file_label.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
+        
+        select_btn = ttk.Button(
+            file_frame,
+            text="ファイルを選択",
+            command=self.select_file
+        )
+        select_btn.pack(side=tk.LEFT, padx=5)
+        
+        # 説明
+        info_text = (
+            "使い方：\n"
+            "1. 「ファイルを選択」ボタンでWAVファイルを選択してください\n"
+            "2. 「処理開始」ボタンで分析を開始します"
+        )
+        info_label = tk.Label(
+            self.root,
+            text=info_text,
+            font=("Arial", 10),
+            justify=tk.LEFT,
+            fg="gray"
+        )
+        info_label.pack(pady=10)
+        
+        # ボタンフレーム
+        button_frame = ttk.Frame(self.root, padding="10")
+        button_frame.pack(pady=20)
+        
+        self.start_btn = ttk.Button(
+            button_frame,
+            text="処理開始",
+            command=self.start_processing,
+            state=tk.DISABLED,
+            width=15
+        )
+        self.start_btn.pack(side=tk.LEFT, padx=10)
+        
+        quit_btn = ttk.Button(
+            button_frame,
+            text="終了",
+            command=self.quit_app,
+            width=15
+        )
+        quit_btn.pack(side=tk.LEFT, padx=10)
+    
+    def select_file(self):
+        """ファイル選択ダイアログを開く"""
+        file_path = filedialog.askopenfilename(
+            title="WAVファイルを選択してください",
+            filetypes=[("WAV files", "*.wav"), ("All files", "*.*")]
+        )
+        
+        if file_path:
+            self.file_path = file_path
+            self.file_path_var.set(os.path.basename(file_path))
+            self.start_btn.config(state=tk.NORMAL)
+            print(f"選択されたファイル: {file_path}")
+    
+    def start_processing(self):
+        """処理を開始"""
+        if self.file_path:
+            self.should_start = True
+            self.root.quit()
+            self.root.destroy()
+    
+    def quit_app(self):
+        """アプリケーションを終了"""
+        self.should_start = False
+        self.root.quit()
+        self.root.destroy()
+    
+    def run(self):
+        """GUIを表示して実行"""
+        self.root.mainloop()
+        return self.file_path if self.should_start else None
+
+
 # ===== フレームフィルタリングGUI クラス定義 =====
 class FrameFilteringGUI:
     def __init__(self, y, sr, frame_times, mfcc_array, labels, frame_length, processing_params):
@@ -39,7 +148,7 @@ class FrameFilteringGUI:
         self.finished = False
         self.reprocess_requested = False
 
-        # フォントサイズ管理（追加）
+        # フォントサイズ管理
         self.font_size = 12
         
         # GUIウィンドウの作成
@@ -78,15 +187,24 @@ class FrameFilteringGUI:
         self.progress_label.pack(pady=10)
 
         # ===== WAV選択エリアを追加 =====
-        audio_frame = ttk.Frame(self.root, padding="5")
+        audio_frame = ttk.LabelFrame(self.root, text="オーディオソース", padding="10")
         audio_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
 
-        ttk.Label(audio_frame, text="オーディオソース:").pack(side=tk.LEFT, padx=5)
         self.audio_path_var = tk.StringVar(value="（元のファイルを使用）")
-        self.audio_label = ttk.Label(audio_frame, textvariable=self.audio_path_var, width=50)
-        self.audio_label.pack(side=tk.LEFT, padx=5)
+        audio_label = ttk.Label(
+            audio_frame,
+            textvariable=self.audio_path_var,
+            relief=tk.SUNKEN,
+            width=50
+        )
+        audio_label.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
 
-        select_wav_btn = ttk.Button(audio_frame, text="WAVを選択", command=self.select_wav_file, width=12)
+        select_wav_btn = ttk.Button(
+            audio_frame,
+            text="別のWAVを選択",
+            command=self.select_wav_file,
+            width=15
+        )
         select_wav_btn.pack(side=tk.LEFT, padx=5)
         # ===================================
         
@@ -288,7 +406,7 @@ class FrameFilteringGUI:
         self.top_db_slider.set(self.param_top_db)
         self.top_db_slider.pack(side=tk.LEFT, padx=5)
         
-        # フォントサイズ調整（追加） - これ以外は元に戻すため最小限の変更です
+        # フォントサイズ調整
         font_frame = ttk.Frame(param_frame)
         font_frame.pack(fill=tk.X, pady=5)
         
@@ -417,7 +535,7 @@ class FrameFilteringGUI:
         """現在のフレーム情報を更新"""
         if self.current_index >= len(self.frame_times):
             self.info_label.config(
-                text="すべてのフレームを確認しました。\n「完了」をクリックしてください。"
+                text="すべての���レームを確認しました。\n「完了」をクリックしてください。"
             )
             self.play_btn.config(state=tk.DISABLED)
             self.exclude_btn.config(state=tk.DISABLED)
@@ -627,17 +745,13 @@ class FrameFilteringGUI:
         }
 
 
-# ===== ファイル選択ダイアログ =====
-root = tk.Tk()
-root.withdraw()  # ウィンドウを表示しない
-
-file_path = filedialog.askopenfilename(
-    title="WAVファイルを選択してください",
-    filetypes=[("WAV files", "*.wav"), ("All files", "*.*")],
-)
+# ===== メイン処理 =====
+# MainGUIでファイル選択
+main_gui = MainGUI()
+file_path = main_gui.run()
 
 if not file_path:
-    print("ファイルが選択されませんでした。")
+    print("処理がキャンセルされました。")
     exit()
 
 print("選択されたファイル:", file_path)
@@ -668,7 +782,7 @@ while reprocess:
     cutoff = processing_params['cutoff']
     b, a = signal.butter(4, cutoff / (sr / 2), btype="high")
     y = signal.filtfilt(b, a, y_original)
-    print(f"ハイパスフィルタ適用完了（{cutoff}Hz以上を抽出）")
+    print(f"ハイパ���フィルタ適用完了（{cutoff}Hz以上を抽出）")
     
     # ===== 鳴き声のある区間だけを抽出 =====
     top_db = processing_params['top_db']
