@@ -42,8 +42,8 @@ class BirdcallAnalysisGUI:
         # 処理状態
         self.processing_done = False
         
-        # フォントサイズ管理
-        self.font_size = 12
+        # フォントサイズ管理（初期サイズを大きくする）
+        self.font_size = 16
         
         # GUIウィンドウの作成
         self.root = tk.Tk()
@@ -114,6 +114,9 @@ class BirdcallAnalysisGUI:
         )
         self.frame_length_slider.set(self.param_frame_length)
         self.frame_length_slider.pack(side=tk.LEFT, padx=5)
+
+        # 説明（簡潔）
+        ttk.Label(frame_length_frame, text="説明: 1フレームの長さ（秒）。長いほど時間情報を多く含む。", foreground="gray").pack(side=tk.LEFT, padx=8)
         
         # ホップ長スライダー
         hop_length_frame = ttk.Frame(param_frame)
@@ -138,6 +141,9 @@ class BirdcallAnalysisGUI:
         )
         self.hop_length_slider.set(self.param_hop_length)
         self.hop_length_slider.pack(side=tk.LEFT, padx=5)
+
+        # 説明（簡潔）
+        ttk.Label(hop_length_frame, text="説明: フレーム間の開始間隔。重なりを制御（小さくすると重複増）。", foreground="gray").pack(side=tk.LEFT, padx=8)
         
         # ハイパスフィルタ周波数スライダー
         cutoff_frame = ttk.Frame(param_frame)
@@ -162,6 +168,9 @@ class BirdcallAnalysisGUI:
         )
         self.cutoff_slider.set(self.param_cutoff)
         self.cutoff_slider.pack(side=tk.LEFT, padx=5)
+
+        # 説明（簡潔）
+        ttk.Label(cutoff_frame, text="説明: この周波数以上を残す。低周波ノイズ除去に有効。", foreground="gray").pack(side=tk.LEFT, padx=8)
         
         # エネルギー閾値スライダー
         top_db_frame = ttk.Frame(param_frame)
@@ -186,19 +195,9 @@ class BirdcallAnalysisGUI:
         )
         self.top_db_slider.set(self.param_top_db)
         self.top_db_slider.pack(side=tk.LEFT, padx=5)
-        
-        # フォントサイズ調整
-        font_frame = ttk.Frame(param_frame)
-        font_frame.pack(fill=tk.X, pady=5)
-        
-        ttk.Label(font_frame, text="GUI フォントサイズ:").pack(side=tk.LEFT, padx=5)
-        self.font_size_label = ttk.Label(font_frame, text=str(self.font_size), width=4)
-        self.font_size_label.pack(side=tk.LEFT, padx=5)
-        
-        dec_font_btn = ttk.Button(font_frame, text="A-", command=lambda: self.change_font_size(-1), width=6)
-        dec_font_btn.pack(side=tk.LEFT, padx=2)
-        inc_font_btn = ttk.Button(font_frame, text="A+", command=lambda: self.change_font_size(1), width=6)
-        inc_font_btn.pack(side=tk.LEFT, padx=2)
+
+        # 説明（簡潔）
+        ttk.Label(top_db_frame, text="説明: 鳴き声区間抽出の閾値（dB）。大きいほど厳しく抽出。", foreground="gray").pack(side=tk.LEFT, padx=8)
         
         # ===== フレーム情報表示エリア =====
         info_frame = ttk.LabelFrame(self.root, text="3. フレーム情報", padding="10")
@@ -513,12 +512,6 @@ class BirdcallAnalysisGUI:
         except Exception as e:
             messagebox.showerror("読み込みエラー", f"WAVファイルの読み込みに失敗しました：\n{e}")
     
-    def change_font_size(self, delta):
-        """フォントサイズを増減させる"""
-        self.font_size = max(8, self.font_size + delta)
-        self.font_size_label.config(text=str(self.font_size))
-        self.apply_font_size()
-
     def apply_font_size(self):
         """設定したフォントサイズを主要ウィジェットに適用する"""
         try:
