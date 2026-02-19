@@ -1,6 +1,7 @@
 import os
 import tkinter as tk
 from tkinter import filedialog, ttk, messagebox
+import tkinter.font as tkfont
 import threading
 
 import librosa
@@ -50,7 +51,13 @@ class BirdcallAnalysisGUI:
         self.root.title("鳥の鳴き声分析ツール")
         self.root.geometry("750x850")
 
-        # ベースフォントを取得して初期サイズを設定
+        # アプリ全体のデフォルトフォントを設定（tkウィジェットに反映）
+        try:
+            self.root.option_add("*Font", ("Arial", self.font_size))
+        except Exception:
+            pass
+
+        # ベースフォントを取得して初期サイズを設定（TkDefaultFont を変更して ttk も反映を試みる）
         try:
             self.base_font = tkfont.nametofont("TkDefaultFont")
             self.base_font.configure(size=self.font_size)
@@ -400,7 +407,7 @@ class BirdcallAnalysisGUI:
                 if duration >= 0.1:  # 0.1秒以上の音だけ採用
                     segments.append((start, end))
             
-            print(f"抽出された鳴き声区間: {len(segments)}")
+            print(f"抽��された鳴き声区間: {len(segments)}")
             self.segments = segments
             
             # ===== スペクトログラム表示 =====
@@ -515,12 +522,20 @@ class BirdcallAnalysisGUI:
     def apply_font_size(self):
         """設定したフォントサイズを主要ウィジェットに適用する"""
         try:
+            # TkDefaultFont を更新（ttk も反映する場合がある）
             if self.base_font is not None:
                 self.base_font.configure(size=self.font_size)
         except Exception:
             pass
 
         try:
+            # tkinter ウィジェット向けにデフォルトフォントを再設定
+            self.root.option_add("*Font", ("Arial", self.font_size))
+        except Exception:
+            pass
+
+        try:
+            # 情報表示系はやや大きめに
             self.info_label.config(font=("Arial", max(10, int(self.font_size + 2))))
             self.progress_label.config(font=("Arial", max(10, int(self.font_size))))
         except Exception:
@@ -651,7 +666,7 @@ class BirdcallAnalysisGUI:
         self.update_info()
     
     def save_all_frames(self):
-        """除外していないすべてのフレームを一括保存"""
+        """���外していないすべてのフレームを一括保存"""
         frames_to_save = [i for i, keep in enumerate(self.keep_flags) if keep]
         
         if not frames_to_save:
