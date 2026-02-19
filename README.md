@@ -1,5 +1,6 @@
 # Bird Call UMAP - 鳥の鳴き声を可視化する 🐦
 <img width="800" height="600" alt="UMAP 3kHz以上" src="https://github.com/user-attachments/assets/5c9b5964-8775-444e-88cf-07e2e3d56f79" />　
+![nakigoe py_](https://github.com/user-attachments/assets/d7b80941-3b8f-4050-9bc9-0333ccf18a32)
 
 このプロジェクトは、鳥の鳴き声の可視化を試みる**実験作品**です。  
 Copilot との協働です。作者に音響学の専門知識はありません。
