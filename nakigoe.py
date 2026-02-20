@@ -371,6 +371,31 @@ class BirdcallAnalysisGUI:
         
         # 初期表示を更新
         self.apply_font_size()
+        
+    def get_output_dir(self):
+        """
+        出力先フォルダを返す。
+        既定: 選択した WAV ファイルと同じフォルダ配下に cluster_segments を作る。
+        （カレントディレクトリに書き込めない環境でも動きやすい）
+        """
+        base_dir = os.path.dirname(self.file_path) if self.file_path else os.getcwd()
+        output_dir = os.path.join(base_dir, "cluster_segments")
+
+        try:
+            os.makedirs(output_dir, exist_ok=True)
+        except PermissionError as e:
+            # どこに作ろうとして失敗したかを明示
+            messagebox.showerror(
+                "アクセスエラー",
+                f"出力フォルダを作成できませんでした。\n\n"
+                f"出力先: {output_dir}\n"
+                f"エラー: {e}\n\n"
+                f"対処: 書き込み可能な場所（例: ドキュメント配下）にWAVを置く／管理者権限で実行する等を試してください。"
+            )
+            raise
+
+        return output_dir    
+
     
     def select_file(self):
         """メインのWAVファイルを選択"""
@@ -402,9 +427,8 @@ class BirdcallAnalysisGUI:
     def process_audio(self):
         """音声処理のメイン処理"""
         try:
-            # 出力ディレクトリの作成
-            output_dir = "cluster_segments"
-            os.makedirs(output_dir, exist_ok=True)
+            # 出力ディレクトリの作成（WAVと同じフォルダ配下）
+            output_dir = self.get_output_dir()
             
             # ===== 音声読み込み =====
             y_original, sr = librosa.load(self.file_path, sr=None)
@@ -787,8 +811,8 @@ class BirdcallAnalysisGUI:
         
         print(f"フィルタリング完了: {len(filtered_indices)} / {len(self.keep_flags)} フレームを保持")
         
-        # 出力ディレクトリ
-        output_dir = "cluster_segments"
+        # 出力ディレクトリ（WAVと同じフォルダ配下）
+        output_dir = self.get_output_dir()
         
         # UMAP 可視化
         umap = UMAP(n_components=2, random_state=0)
@@ -889,4 +913,5 @@ class BirdcallAnalysisGUI:
 if __name__ == "__main__":
     app = BirdcallAnalysisGUI()
     app.run()
+
 
