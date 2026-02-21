@@ -6,10 +6,12 @@ import threading
 
 import librosa
 import librosa.display
+import json
 import matplotlib.pyplot as plt
 import numpy as np
 import sounddevice as sd
 import soundfile as sf
+from matplotlib.widgets import Button
 from sklearn.cluster import KMeans
 from umap import UMAP
 import scipy.signal as signal
@@ -814,20 +816,265 @@ class BirdcallAnalysisGUI:
         # 出力ディレクトリ（WAVと同じフォルダ配下）
         output_dir = self.get_output_dir()
         
-        # UMAP 可視化
+        # UMAP 可視化（インタラクティブ）
         umap = UMAP(n_components=2, random_state=0)
         points = umap.fit_transform(mfcc_array)
+        labels_array = np.array(labels)
+        unique_labels = sorted(set(labels_array))
+        marker_options = ["o", "^", "s", "P", "X", "D", "*", "v", "<", ">"]
+        cmap = plt.get_cmap("tab10")
+        fig, ax = plt.subplots(figsize=(8, 6))
+        fig.subplots_adjust(bottom=0.2)
+        base_size = 70.0
+        cluster_plots = {}
+        index_lookup = {}
         
-        plt.figure(figsize=(8, 6))
-        plt.scatter(points[:, 0], points[:, 1], c=labels, cmap="tab10")
-        plt.title("Bird Call Clustering (UMAP)")
-        plt.xlabel("UMAP Dimension 1")
-        plt.ylabel("UMAP Dimension 2")
+        for idx, label_id in enumerate(unique_labels):
+            mask = labels_array == label_id
+            base_sizes = np.full(np.sum(mask), base_size, dtype=float)
+            color = cmap(idx % cmap.N)
+            marker = marker_options[idx % len(marker_options)]
+            scatter = ax.scatter(
+                points[mask, 0],
+                points[mask, 1],
+                c=[color],
+                marker=marker,
+                s=base_sizes,
+                label=f"Cluster {label_id}"
+            )
+            indices = np.nonzero(mask)[0].tolist()
+            cluster_plots[label_id] = {
+                "scatter": scatter,
+                "base_sizes": base_sizes,
+                "indices": indices,
+            }
+            for local_idx, global_idx in enumerate(indices):
+                index_lookup[global_idx] = (label_id, local_idx)
+        
+        ax.set_title("Bird Call Clustering (UMAP)")
+        ax.set_xlabel("UMAP Dimension 1")
+        ax.set_ylabel("UMAP Dimension 2")
+        ax.legend()
+        
+        playback_state = {"playing": False}
+        
+        def reset_sizes():
+            for data in cluster_plots.values():
+                data["scatter"].set_sizes(data["base_sizes"])
+            fig.canvas.draw_idle()
+        
+        def animate_bloom(label_id, local_idx):
+            data = cluster_plots[label_id]
+            sizes = data["base_sizes"].copy()
+            sizes[local_idx] = sizes[local_idx] * 3.0
+            data["scatter"].set_sizes(sizes)
+            fig.canvas.draw_idle()
+        
+        def restore_bloom(label_id):
+            data = cluster_plots[label_id]
+            data["scatter"].set_sizes(data["base_sizes"])
+            fig.canvas.draw_idle()
+        
+        def play_sequence(event):
+            if playback_state["playing"]:
+                return
+            
+            playback_state["playing"] = True
+            
+            def worker():
+                try:
+                    for global_idx, frame_time in enumerate(frame_times):
+                        start_sample = int(frame_time * self.sr)
+                        end_sample = min(start_sample + self.frame_length, len(self.y))
+                        frame_audio = self.y[start_sample:end_sample]
+                        label_local = index_lookup.get(global_idx)
+                        
+                        if label_local is not None:
+                            label_id, local_idx = label_local
+                            animate_bloom(label_id, local_idx)
+                        
+                        sd.play(frame_audio, self.sr)
+                        sd.wait()
+                        
+                        if label_local is not None:
+                            restore_bloom(label_id)
+                    
+                    reset_sizes()
+                except Exception as e:
+                    print(f"再生中のエラー: {e}")
+                finally:
+                    playback_state["playing"] = False
+            
+            threading.Thread(target=worker, daemon=True).start()
+        
+        play_ax = fig.add_axes([0.72, 0.05, 0.2, 0.08])
+        play_button = Button(play_ax, "再生", color="lightgoldenrodyellow", hovercolor="0.95")
+        play_button.on_clicked(play_sequence)
         
         umap_path = os.path.join(output_dir, "cluster_visualization_umap.png")
-        plt.savefig(umap_path, dpi=150, bbox_inches="tight")
+        fig.savefig(umap_path, dpi=150, bbox_inches="tight")
         print(f"UMAP可視化を保存しました: {umap_path}")
         plt.show()
+
+        # ブラウザ用データ出力
+        umap_json_path = os.path.join(output_dir, "umap_data.json")
+        export_points = []
+        for idx, (x, y_val) in enumerate(points):
+            export_points.append(
+                {
+                    "id": idx,
+                    "x": float(x),
+                    "y": float(y_val),
+                    "label": int(labels[idx]),
+                    "time": float(frame_times[idx]),
+                }
+            )
+        with open(umap_json_path, "w", encoding="utf-8") as f:
+            json.dump({"points": export_points}, f, ensure_ascii=False, indent=2)
+
+        # ブラウザでの写実的な開花アニメーション用HTML
+        html_path = os.path.join(output_dir, "umap_viz.html")
+        palette = [
+            "#4c78a8",
+            "#f58518",
+            "#e45756",
+            "#72b7b2",
+            "#54a24b",
+            "#eeca3b",
+            "#b279a2",
+            "#ff9da6",
+            "#9d755d",
+            "#bab0ac",
+        ]
+        with open(html_path, "w", encoding="utf-8") as f:
+            f.write(
+                f"""<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>UMAP Bloom</title>
+  <style>
+    body {{
+      margin: 0;
+      background: radial-gradient(circle at 20% 20%, #1b1f2a, #0c101a 70%);
+      color: #eef2ff;
+      font-family: "Segoe UI", sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      height: 100vh;
+    }}
+    #viz {{
+      border: 1px solid #334155;
+      background: linear-gradient(145deg, rgba(255,255,255,0.03), rgba(255,255,255,0));
+      box-shadow: 0 20px 50px rgba(0,0,0,0.35);
+    }}
+    button {{
+      padding: 10px 18px;
+      background: #22c55e;
+      color: #0b1b20;
+      border: none;
+      border-radius: 6px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 10px 30px rgba(34,197,94,0.35);
+    }}
+    button:disabled {{
+      opacity: 0.5;
+      cursor: default;
+    }}
+  </style>
+</head>
+<body>
+  <button id="play">開花を再生</button>
+  <canvas id="viz" width="900" height="650"></canvas>
+  <script>
+    const palette = {json.dumps(palette)};
+    const canvas = document.getElementById("viz");
+    const ctx = canvas.getContext("2d");
+    const playBtn = document.getElementById("play");
+    let points = [];
+    let bounds = {{minX:0, maxX:1, minY:0, maxY:1}};
+    const bloomQueue = [];
+
+    function normalizePoint(p) {{
+      const x = ((p.x - bounds.minX) / (bounds.maxX - bounds.minX || 1)) * canvas.width;
+      const y = ((p.y - bounds.minY) / (bounds.maxY - bounds.minY || 1)) * canvas.height;
+      return {{...p, nx: x, ny: canvas.height - y}};
+    }}
+
+    function drawBase() {{
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      for (const p of bloomQueue) {{
+        const r = p.radius;
+        const grad = ctx.createRadialGradient(p.nx, p.ny, r * 0.3, p.nx, p.ny, r);
+        grad.addColorStop(0, p.color + "cc");
+        grad.addColorStop(1, p.color + "00");
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(p.nx, p.ny, r, 0, Math.PI * 2);
+        ctx.fill();
+      }}
+      for (const p of points) {{
+        ctx.fillStyle = palette[p.label % palette.length];
+        ctx.beginPath();
+        ctx.arc(p.nx, p.ny, 6, 0, Math.PI * 2);
+        ctx.fill();
+      }}
+    }}
+
+    function bloom(point) {{
+      const entry = {{
+        ...point,
+        radius: 10,
+        color: palette[point.label % palette.length],
+        life: 0
+      }};
+      bloomQueue.push(entry);
+    }}
+
+    function animate() {{
+      for (const b of bloomQueue) {{
+        b.radius += 1.8;
+        b.life += 1;
+      }}
+      for (let i = bloomQueue.length - 1; i >= 0; i--) {{
+        if (bloomQueue[i].life > 45) bloomQueue.splice(i, 1);
+      }}
+      drawBase();
+      requestAnimationFrame(animate);
+    }}
+
+    async function load() {{
+      const res = await fetch("umap_data.json");
+      const data = await res.json();
+      bounds.minX = Math.min(...data.points.map(p => p.x));
+      bounds.maxX = Math.max(...data.points.map(p => p.x));
+      bounds.minY = Math.min(...data.points.map(p => p.y));
+      bounds.maxY = Math.max(...data.points.map(p => p.y));
+      points = data.points.map(normalizePoint);
+      drawBase();
+    }}
+
+    playBtn.addEventListener("click", async () => {{
+      playBtn.disabled = true;
+      for (const p of points) {{
+        bloom(p);
+        await new Promise(r => setTimeout(r, 350));
+      }}
+      setTimeout(() => (playBtn.disabled = false), 800);
+    }});
+
+    load();
+    animate();
+  </script>
+</body>
+</html>"""
+            )
+        print(f"ブラウザ用UMAPデータを保存しました: {umap_json_path}")
+        print(f"ブラウザ用UMAPビジュアルを保存しました: {html_path}")
         
         # クラスタごとの代表鳴き声を保存
         num_samples = 10
