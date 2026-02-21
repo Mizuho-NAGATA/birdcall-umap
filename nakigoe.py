@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import sounddevice as sd
 import soundfile as sf
+from matplotlib.widgets import Button
 from sklearn.cluster import KMeans
 from umap import UMAP
 import scipy.signal as signal
@@ -814,18 +815,103 @@ class BirdcallAnalysisGUI:
         # 出力ディレクトリ（WAVと同じフォルダ配下）
         output_dir = self.get_output_dir()
         
-        # UMAP 可視化
+        # UMAP 可視化（インタラクティブ）
         umap = UMAP(n_components=2, random_state=0)
         points = umap.fit_transform(mfcc_array)
+        labels_array = np.array(labels)
+        unique_labels = sorted(set(labels_array))
+        marker_options = ["o", "^", "s", "P", "X", "D", "*", "v", "<", ">"]
+        cmap = plt.get_cmap("tab10")
+        fig, ax = plt.subplots(figsize=(8, 6))
+        fig.subplots_adjust(bottom=0.2)
+        base_size = 70.0
+        cluster_plots = {}
+        index_lookup = {}
         
-        plt.figure(figsize=(8, 6))
-        plt.scatter(points[:, 0], points[:, 1], c=labels, cmap="tab10")
-        plt.title("Bird Call Clustering (UMAP)")
-        plt.xlabel("UMAP Dimension 1")
-        plt.ylabel("UMAP Dimension 2")
+        for idx, label_id in enumerate(unique_labels):
+            mask = labels_array == label_id
+            base_sizes = np.full(np.sum(mask), base_size, dtype=float)
+            color = cmap(idx % cmap.N)
+            marker = marker_options[idx % len(marker_options)]
+            scatter = ax.scatter(
+                points[mask, 0],
+                points[mask, 1],
+                c=[color],
+                marker=marker,
+                s=base_sizes,
+                label=f"Cluster {label_id}"
+            )
+            indices = np.nonzero(mask)[0].tolist()
+            cluster_plots[label_id] = {
+                "scatter": scatter,
+                "base_sizes": base_sizes,
+                "indices": indices,
+            }
+            for local_idx, global_idx in enumerate(indices):
+                index_lookup[global_idx] = (label_id, local_idx)
+        
+        ax.set_title("Bird Call Clustering (UMAP)")
+        ax.set_xlabel("UMAP Dimension 1")
+        ax.set_ylabel("UMAP Dimension 2")
+        ax.legend()
+        
+        playback_state = {"playing": False}
+        
+        def reset_sizes():
+            for data in cluster_plots.values():
+                data["scatter"].set_sizes(data["base_sizes"])
+            fig.canvas.draw_idle()
+        
+        def animate_bloom(label_id, local_idx):
+            data = cluster_plots[label_id]
+            sizes = data["base_sizes"].copy()
+            sizes[local_idx] = sizes[local_idx] * 3.0
+            data["scatter"].set_sizes(sizes)
+            fig.canvas.draw_idle()
+        
+        def restore_bloom(label_id):
+            data = cluster_plots[label_id]
+            data["scatter"].set_sizes(data["base_sizes"])
+            fig.canvas.draw_idle()
+        
+        def play_sequence(event):
+            if playback_state["playing"]:
+                return
+            
+            playback_state["playing"] = True
+            
+            def worker():
+                try:
+                    for global_idx, frame_time in enumerate(frame_times):
+                        start_sample = int(frame_time * self.sr)
+                        end_sample = min(start_sample + self.frame_length, len(self.y))
+                        frame_audio = self.y[start_sample:end_sample]
+                        label_local = index_lookup.get(global_idx)
+                        
+                        if label_local is not None:
+                            label_id, local_idx = label_local
+                            animate_bloom(label_id, local_idx)
+                        
+                        sd.play(frame_audio, self.sr)
+                        sd.wait()
+                        
+                        if label_local is not None:
+                            restore_bloom(label_id)
+                    
+                    reset_sizes()
+                except Exception as e:
+                    print(f"再生中のエラー: {e}")
+                finally:
+                    playback_state["playing"] = False
+            
+            threading.Thread(target=worker, daemon=True).start()
+        
+        play_ax = fig.add_axes([0.72, 0.05, 0.2, 0.08])
+        play_button = Button(play_ax, "再生", color="lightgoldenrodyellow", hovercolor="0.95")
+        play_button.on_clicked(play_sequence)
         
         umap_path = os.path.join(output_dir, "cluster_visualization_umap.png")
-        plt.savefig(umap_path, dpi=150, bbox_inches="tight")
+        fig.savefig(umap_path, dpi=150, bbox_inches="tight")
         print(f"UMAP可視化を保存しました: {umap_path}")
         plt.show()
         
