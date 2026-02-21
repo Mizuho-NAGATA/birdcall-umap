@@ -29,8 +29,8 @@ class BirdcallAnalysisGUI:
         self.segments = []
         
         # パラメーター（初期値）
-        self.param_frame_length = 0.2
-        self.param_hop_length = 0.2
+        self.param_frame_length = 0.25
+        self.param_hop_length = 0.25
         self.param_cutoff = 3000
         self.param_top_db = 45
         
@@ -913,5 +913,6 @@ class BirdcallAnalysisGUI:
 if __name__ == "__main__":
     app = BirdcallAnalysisGUI()
     app.run()
+
 
 
